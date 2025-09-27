@@ -128,8 +128,11 @@ public class Emulator {
 
         mips.PC = initialPC;
         mips.branchDelaySet = false;
-        mips.gpr[29] = mips.gpr[30] = initialSP;
-        mips.gpr[28] = initialGP;
+
+        if (baseAddress != 0) {
+            mips.gpr[29] = mips.gpr[30] = initialSP;
+            mips.gpr[28] = initialGP;
+        }
     }
     
     public void runFor(int cycles) {

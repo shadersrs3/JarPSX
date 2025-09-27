@@ -7,6 +7,8 @@ import jarpsx.backend.Emulator;
 import jarpsx.backend.mips.Interpreter;
 
 public class MIPS {
+    private static final int[] exceptionAddress_BEV0 = { 0xBFC0_0000, 0x8000_0000, 0x8000_0040, 0x8000_0080 };
+    private static final int[] exceptionAddress_BEV1 = { 0xBFC0_0000, 0xBFC0_0100, 0xBFC0_0140, 0xBFC0_0180 };
     public static final int Exception_Interrupt = 0x00;
     public static final int Exception_MOD = 0x01;
     public static final int Exception_TLBL = 0x02;
@@ -61,17 +63,15 @@ public class MIPS {
     public int branchPC;
     public boolean branchDelaySet;
     public boolean exceptionBranchDelay;
+    public Cop0Register[] cop0reg;
+    public int[] gteReg;
+    public int loadDelayCounter;
+    public LoadDelayRegister[] loadDelayReg;
 
     public class LoadDelayRegister {
         public int value;
         public int index;
     }
-
-    public int loadDelayCounter;
-    public LoadDelayRegister[] loadDelayReg;
-
-    private static final int[] exceptionAddress_BEV0 = { 0xBFC0_0000, 0x8000_0000, 0x8000_0040, 0x8000_0080 };
-    private static final int[] exceptionAddress_BEV1 = { 0xBFC0_0000, 0xBFC0_0100, 0xBFC0_0140, 0xBFC0_0180 };
 
     public class Cop0Register {
         private String name;
@@ -105,8 +105,18 @@ public class MIPS {
             return value;
         }
     }
-    
-    Cop0Register[] cop0reg;
+
+    public interface Cop2RegisterInterface {
+        public String getName();
+        public int getIndex();
+        public void setValue(int value);
+        public int getValue();
+        public void setValue64(long value);
+        public long getValue64();
+        default String getCopRegisterName() {
+            return "";
+        }
+    }
     
     public MIPS(Emulator emulator) {
         this.emulator = emulator;
@@ -125,6 +135,8 @@ public class MIPS {
         cop0reg[13] = new Cop0Register("CAUSE", 0, 13);
         cop0reg[14] = new Cop0Register("EPC", 0, 14);
         cop0reg[15] = new Cop0Register("PRID", 0xbaadf00d, 15);
+
+        gteReg = new int[64];
 
         hi = lo = branchPC = 0;
         branchDelaySet = false;
@@ -157,6 +169,7 @@ public class MIPS {
         loadDelayReg[loadDelayCounter].index = index;
         loadDelayReg[loadDelayCounter].value = data;    
         loadDelayCounter++;
+        // gpr[index] = data;
     }
 
     public long getCyclesElapsed() {
@@ -261,9 +274,22 @@ public class MIPS {
 
     static boolean once = false;
     static String test;
-    static int counter;
+    static int counter = 0;
+
     public void step() {
         switch (PC) {
+        /*
+        case 0x80010310:
+            if (counter > 50) { // make a blacklist here
+                PC = 0x80010130; // or exit as you like
+            }
+            break;
+        case 0x80010108:
+            // assume static counter = 0
+            counter++;
+            System.out.println("Test " + counter);
+            break;
+        */
         case 0xB0:
             if (gpr[9] == 0x3d) {
                 if ((char)gpr[4] == '\n') {
@@ -277,8 +303,27 @@ public class MIPS {
         case 0x80030000:
             try {
                 if (once == false) {
-                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\psxtest_cpu.exe");
+                    // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\jakub\\gte\\test-all\\test-all.exe");
+                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\psxtest_cpx.exe");
                     once = true;
+
+                    String[] args = { "auto\0", "console\0", "release\0" };
+                    int argLen = 2;
+                    int len = 0;
+                    
+                    for (int i = 0; i < argLen; i++) {
+                        writeInt(0x1f800004+i*4, 0x1f800044+len);
+                    
+                        int x;
+                        int n = args[i].length();
+                        for (x = len; x < len + n; x++) {
+                            writeByte(0x1f800044 + x, (byte)args[i].charAt(x-len));
+                        }
+                        
+                        len = x;
+                    }
+                    
+                    writeInt(0x1f800000, argLen);
                 }
             } catch (Exception e) {
                 System.out.println("Exception occured: " + e.getMessage());
@@ -296,7 +341,11 @@ public class MIPS {
             break;
         }
         }
-                
+
+        if ((cop0reg[12].value & 1) != 0) {
+            //System.out.printf("interrupt occured\n");
+        }
+
         boolean branchDelaySet = this.branchDelaySet == true;
         boolean loadDelaySet = loadDelayCounter > 0;
         Instruction instruction = new Instruction(emulator.getMemory().readInt(PC));
@@ -310,5 +359,6 @@ public class MIPS {
         }
 
         exceptionBranchDelay = false;
+        incrementCycles(1L);
     }
 }

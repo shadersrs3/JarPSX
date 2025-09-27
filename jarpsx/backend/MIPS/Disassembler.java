@@ -52,6 +52,13 @@ public class Disassembler {
         "cop0r28", "cop0r29", "cop0r30", "cop0r31",
     };
 
+    public static String[] cop2RegisterNames = {
+        "vxy0", "vz0", "vxy1", "vz1", "vxy2", "vz2", "rgbc", "otz",
+        "ir0", "ir1", "ir2", "ir3", "sxy0", "sxy1", "sxy2", "sxyp",
+        "sz0", "sz1", "sz2", "sz3", "rgb0", "rgb1", "rgb2", "res1",
+        "mac0", "mac1", "mac2", "mac3", "irgb", "orgb", "lzcs", "lzcr",
+    };
+
     private static String disassembleShiftType(boolean useAliasedRegisters, String name, int destination, int source, int shift, boolean variableType) {
         String sourceString, destinationString;
         String immediateLiteralString;

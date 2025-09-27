@@ -1,6 +1,8 @@
 package jarpsx.backend.mips;
 
 import jarpsx.backend.mips.Instruction;
+import jarpsx.backend.mips.GTEInterpreter;
+import jarpsx.backend.mips.GTEInstruction;
 import jarpsx.backend.mips.Disassembler;
 
 public class Interpreter {
@@ -414,6 +416,36 @@ public class Interpreter {
         System.out.println(String.format("Invalid cop0 opcode %02X PC %08X", op, mips.PC));
         System.exit(-1);
     }
+    
+    public static void interpretCOP2(MIPS mips, Instruction instruction) {
+        int op = instruction.rs();
+
+        if ((op & 0b10000) == 0b10000) {
+            GTEInterpreter.execute(mips, new GTEInstruction(instruction.getData() & 0x1FFFFFF));
+            return;
+        }
+        
+        switch (op) {
+        case 0b0_0000:
+            mips.writeGPRDelayed(instruction.rt(), GTEInterpreter.readRegister(mips, instruction.rd()));
+            mips.PC += 4;
+            return;
+        case 0b0_0010:
+            mips.writeGPRDelayed(instruction.rt(), GTEInterpreter.readRegister(mips, instruction.rd() + 32));
+            mips.PC += 4;
+            return;
+        case 0b0_0100:
+            GTEInterpreter.writeRegister(mips, instruction.rd(), mips.gpr[instruction.rt()]);
+            mips.PC += 4;
+            return;
+        case 0b0_0110:
+            GTEInterpreter.writeRegister(mips, instruction.rd() + 32, mips.gpr[instruction.rt()]);
+            mips.PC += 4;
+            return;
+        }
+        System.out.println(String.format("Invalid cop2 opcode %02X PC %08X", op, mips.PC));
+        System.exit(-1);
+    }
 
     public static void interpretADDI(MIPS mips, Instruction instruction) {
         int imm = instruction.signedImmediate();
@@ -794,6 +826,7 @@ public class Interpreter {
         opcodeExecutor[0x06] = Interpreter::interpretBLEZ;
         opcodeExecutor[0x07] = Interpreter::interpretBGTZ;
         opcodeExecutor[0x10] = Interpreter::interpretCOP0;
+        opcodeExecutor[0x12] = Interpreter::interpretCOP2;
         opcodeExecutor[0x08] = Interpreter::interpretADDI;
         opcodeExecutor[0x09] = Interpreter::interpretADDIU;
         opcodeExecutor[0x0A] = Interpreter::interpretSLTI;

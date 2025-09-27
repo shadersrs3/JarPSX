@@ -500,6 +500,7 @@ class Main {
                 System.out.println("    " + elements[i].toString());
             }
         }
+        
         /*
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
@@ -509,6 +510,7 @@ class Main {
             }
         });
         */
+
         while (true) {
             try {
                 long start = System.nanoTime();
@@ -522,7 +524,7 @@ class Main {
                 
                 if (msRequired <= 16) {
                     emu.stats.microsecondsRan += (int) (((float)16 - (float)elapsedNanoseconds / 1000000f) * 1000f);
-                    Thread.sleep(16 - msRequired, 670000);
+                    //Thread.sleep(16 - msRequired, 670000);
                 } else {
                     emu.stats.microsecondsRan += us;
                 }

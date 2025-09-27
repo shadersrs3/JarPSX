@@ -132,6 +132,10 @@ public class Memory {
                 return scratchpad[offset];
             }
 
+            if (offset >= 0x1040 && offset <= 0x105F) {
+                return 0;
+            }
+
             throw new RuntimeException(String.format("Unimplemented readByte I/O offset 0x%04X", offset));
         }
 
@@ -144,6 +148,10 @@ public class Memory {
                 return (short) result;
             }
 
+            if (offset >= 0x1040 && offset <= 0x105F) {
+                return 0;
+            }
+
             switch (offset) {
             case 0x1100:
             case 0x1104:
@@ -154,6 +162,7 @@ public class Memory {
             case 0x1120:
             case 0x1124:
             case 0x1128:
+            case 0x1070:
                 return 0;
             case 0x1074:
                 return 0;
@@ -209,7 +218,12 @@ public class Memory {
                 return;
             }
 
+            if (offset >= 0x1040 && offset <= 0x105F) {
+                return;
+            }
+
             switch (offset) {
+            case 0x1070:
             case 0x1074:
                 return;
             }
