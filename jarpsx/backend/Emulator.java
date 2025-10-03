@@ -1,12 +1,15 @@
 package jarpsx.backend;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import jarpsx.backend.mips.MIPS;
-import jarpsx.backend.mips.Debugger;
-import jarpsx.backend.Memory;
+import jarpsx.backend.component.*;
+import jarpsx.backend.*;
+import jarpsx.backend.mips.*;
 
 public class Emulator {
     static public class Stats {
@@ -14,32 +17,41 @@ public class Emulator {
         public long microsecondsRan;
     }
 
-    private Memory memory;
-    private MIPS mips;
-    private Debugger debugger;
-    private boolean error;
+    public Memory memory;
+    public MIPS mips;
+    public Debugger debugger;
+    public CDROM cdrom;
+    public DMA dma;
+    public InterruptController interruptController;
+    public MDEC mdec;
+    public Peripheral peripheral;
+    public SPU spu;
+    public Timer timer;
+    public Scheduler scheduler;
     public Stats stats;
+    public Disk disk;
+    private boolean error;
 
     public Emulator() {
+        scheduler = new Scheduler(this);
         memory = new Memory(this);
         mips = new MIPS(this);
         debugger = new Debugger(this);
+        interruptController = new InterruptController(this);
+        timer = new Timer(this);
+        dma = new DMA(this);
+        cdrom = new CDROM(this);
         stats = new Stats();
+        disk = new Disk();
+
         stats.microsecondsRanPerFrame = stats.microsecondsRan = 0;
+        scheduler.registerEventCallback(Scheduler.EVENT_BREAK_DISPATCH, (userdata) -> {
+            scheduler.schedule(20000, Scheduler.EVENT_BREAK_DISPATCH, null);
+        });
+        
+        scheduler.schedule(20000, Scheduler.EVENT_BREAK_DISPATCH, null);
 
         error = false;
-    }
-
-    public Memory getMemory() {
-        return memory;
-    }
-
-    public MIPS getCpu() {
-        return mips;
-    }
-
-    public Debugger getDebugger() {
-        return debugger;
     }
 
     public void setError(boolean state) {
@@ -133,19 +145,35 @@ public class Emulator {
             mips.gpr[29] = mips.gpr[30] = initialSP;
             mips.gpr[28] = initialGP;
         }
+
+        reader.close();
+    }
+    
+    public void dumpMemory() {
+        try {
+            FileOutputStream out = new FileOutputStream(Paths.get("").toAbsolutePath().toString() + "\\ram.dump");
+            out.write(memory.getRamData());
+            out.close();
+        } catch (Exception e) {
+            
+        }
     }
     
     public void runFor(int cycles) {
         try {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
+                cdrom.step(1);
             }
+
+            interruptController.service(InterruptController.IRQ_VBLANK);
         } catch (Exception exception) {
             StackTraceElement[] elements = exception.getStackTrace();
+
             System.out.println("Stack trace and message: " + exception.getMessage());
-            for (int i = 0; i < elements.length; i++) {
-                System.out.println("    " + elements[i].toString());
-            }
+            exception.printStackTrace();
+            
+            System.out.printf("\nPC %08X", mips.gpr[31]);
             System.exit(-1);
         }
     }

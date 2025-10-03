@@ -8,7 +8,7 @@ for /r %%F in (*.java) do call set "Myvar=%%Myvar%% %%F"
 
 echo Compiling%Myvar%
 
-javac -d class -Xlint:unchecked %Myvar%
+javac -Xdiags:verbose -d class -Xlint:unchecked %Myvar%
 
 rem Execute a class
-java Main
+java MainApp

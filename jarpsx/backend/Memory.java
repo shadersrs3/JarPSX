@@ -1,12 +1,81 @@
 package jarpsx.backend;
 
+import java.io.RandomAccessFile;
+
+import jarpsx.backend.Emulator;
 import jarpsx.backend.PSXIntegerConstants;
 import jarpsx.backend.mips.Disassembler;
+import jarpsx.backend.component.*;
 
 /*
  * Memory is implemented as software fastmem
  */
 public class Memory {
+    // I/O
+    // Memory control
+    public static final int EXPANSION_1_BASE_ADDRESS_OFFSET = 0x1000;
+    public static final int EXPANSION_2_BASE_ADDRESS_OFFSET = 0x1004;
+    public static final int EXPANSION_1_DELAY_OFFSET = 0x1008;
+    public static final int EXPANSION_3_DELAY_OFFSET = 0x100C;
+    public static final int EXPANSION_2_DELAY_OFFSET = 0x101C;
+    public static final int BIOS_ROM_DELAY_OFFSET = 0x1010;
+    public static final int SPU_DELAY_OFFSET = 0x1014;
+    public static final int CDROM_DELAY_OFFSET = 0x1018;
+    public static final int COMMON_DELAY_OFFSET = 0x1020;
+    public static final int RAM_SIZE_OFFSET = 0x1060;
+
+    // Peripheral
+    public static final int JOY_DATA_OFFSET = 0x1040;
+    public static final int JOY_STAT_OFFSET = 0x1044;
+    public static final int JOY_MODE_OFFSET = 0x1048;
+    public static final int JOY_CTRL_OFFSET = 0x104A;
+    public static final int JOY_BAUD_OFFSET = 0x104E;
+    public static final int SIO_DATA_OFFSET = 0x1050;
+    public static final int SIO_STAT_OFFSET = 0x1054;
+    public static final int SIO_MODE_OFFSET = 0x1058;
+    public static final int SIO_CTRL_OFFSET = 0x105A;
+    public static final int SIO_MISC_OFFSET = 0x105C;
+    public static final int SIO_BAUD_OFFSET = 0x105E;
+
+    // Interrupt control
+    public static final int I_STAT_OFFSET = 0x1070;
+    public static final int I_MASK_OFFSET = 0x1074;
+
+    // DMA & Timer handled by memory read/write
+    public static final int DPCR_OFFSET = 0x10F0;
+    public static final int DICR_OFFSET = 0x10F4;
+
+    // CDROM
+    // Read
+    public static final int CDROM_HSTS_OFFSET = 0x1800;
+    public static final int CDROM_RESULT_OFFSET = 0x1801;
+    public static final int CDROM_RDDATA_OFFSET = 0x1802;
+    public static final int CDROM_HINT_OFFSET = 0x1803;
+
+    // Write
+    public static final int CDROM_ADDRESS_OFFSET = 0x1800;
+    public static final int CDROM_COMMAND_OFFSET = 0x1801;
+    public static final int CDROM_PARAMETER_OFFSET = 0x1802;
+    public static final int CDROM_HCHPCTL_OFFSET = 0x1803;
+
+    // GPU
+    // Write
+    public static final int GP0_COMMAND_OFFSET = 0x1810;
+    public static final int GP1_COMMAND_OFFSET = 0x1814;
+    // Read
+    public static final int GPUREAD_OFFSET = 0x1810;
+    public static final int GPUSTAT_OFFSET = 0x1814;
+
+    // MDEC
+    // Write
+    public static final int MDEC_COMMAND_OFFSET = 0x1820;
+    public static final int MDEC_CONTROL_OFFSET = 0x1824;
+    // Read
+    public static final int MDEC_RESPONSE_OFFSET = 0x1820;
+    public static final int MDEC_STATUS_OFFSET = 0x1824;
+
+    // SPU handled by memory read/write
+
     private interface SoftwarePageExecutor {
         public int getAddressMask();
         public byte readByte(int offset);
@@ -136,10 +205,16 @@ public class Memory {
                 return 0;
             }
 
+            switch (offset) {
+            case CDROM_HINT_OFFSET:
+            case CDROM_RDDATA_OFFSET:
+            case CDROM_RESULT_OFFSET:
+            case CDROM_HSTS_OFFSET:
+                return (byte)emulator.cdrom.read(offset - 0x1800);
+            }
+
             throw new RuntimeException(String.format("Unimplemented readByte I/O offset 0x%04X", offset));
         }
-
-        private static int s = 0;
 
         public short readShort(int offset) {
             if (offset >= 0 && offset < 0x400) {
@@ -148,28 +223,27 @@ public class Memory {
                 return (short) result;
             }
 
-            if (offset >= 0x1040 && offset <= 0x105F) {
+            if (offset >= 0x1C00 && offset <= 0x1FFF) {
+                // System.out.printf("Unimplemented SPU readShort 0x1F80%04X\n", offset);
                 return 0;
             }
+
+            if (offset >= 0x1100 && offset <= 0x1108 + 0x20) {
+                Timer.TimerData data = emulator.timer.getTimer((offset - 0x1100) / 0x10);
+                switch (offset & 0xF) {
+                case 0: return (short)data.readValue();
+                case 4: return (short)data.readMode();
+                case 8: return (short)data.readTarget();
+                }
+            }
+
 
             switch (offset) {
-            case 0x1100:
-            case 0x1104:
-            case 0x1108:
-            case 0x1110:
-            case 0x1118:
-            case 0x1114:
-            case 0x1120:
-            case 0x1124:
-            case 0x1128:
-            case 0x1070:
-                return 0;
-            case 0x1074:
-                return 0;
+            case JOY_CTRL_OFFSET: System.out.printf("Unimplemented JOY_CTRL read16\n"); return (short)0;
+            case JOY_STAT_OFFSET: System.out.printf("Unimplemented JOY_STAT read16\n"); return (short)7;
+            case I_STAT_OFFSET: return (short)emulator.interruptController.readStatus();
+            case I_MASK_OFFSET: return (short)emulator.interruptController.readMask();
             }
-
-            if (offset >= 0x1C00 && offset < 0x2000) // SPU
-                return 0;
 
             throw new RuntimeException(String.format("Unimplemented readShort I/O offset 0x%04X", offset));
         }
@@ -180,19 +254,52 @@ public class Memory {
                 return result;
             }
 
+            if (offset >= 0x1C00 && offset <= 0x1FFF) {
+                System.out.printf("Unimplemented SPU readInt 0x1F80%04X", offset);
+                return 0;
+            }
+
+            if (offset >= 0x1080 && offset <= 0x10EF) {
+                DMA.Channel channel = emulator.dma.getChannel((offset - 0x1080) / 0x10);
+
+                switch (offset & 0xF) {
+                case 0: return channel.getBaseAddress();
+                case 4: return channel.getBlockControl();
+                case 8: return channel.getChannelControl();
+                }
+            }
+
+            if (offset >= 0x1100 && offset <= 0x1108 + 0x20) {
+                Timer.TimerData data = emulator.timer.getTimer((offset - 0x1100) / 0x10);
+                switch (offset & 0xF) {
+                case 0: return data.readValue();
+                case 4: return data.readMode();
+                case 8: return data.readTarget();
+                }
+            }
+
             switch (offset) {
-            case 0x1810:
-            case 0x1110:
-            case 0x10A8:
-            case 0x10E8:
-            case 0x10F0:
-            case 0x10F4:
+            case EXPANSION_2_DELAY_OFFSET:
                 return 0;
-            case PSXIntegerConstants.I_STAT_OFFSET:
-            case PSXIntegerConstants.I_MASK_OFFSET:
+            case EXPANSION_1_BASE_ADDRESS_OFFSET:
+            case EXPANSION_2_BASE_ADDRESS_OFFSET:
+            case EXPANSION_1_DELAY_OFFSET:
+            case EXPANSION_3_DELAY_OFFSET:
+            case BIOS_ROM_DELAY_OFFSET:
+            case SPU_DELAY_OFFSET:
+            case CDROM_DELAY_OFFSET:
+            case COMMON_DELAY_OFFSET:
+            case RAM_SIZE_OFFSET:
+                System.out.printf("Unimplemented MEMORY CONTROL readInt 0x1F80%04X\n", offset);
                 return 0;
-            case 0x1814:
-                return 0x1c000000;
+            case I_STAT_OFFSET: return emulator.interruptController.readStatus();
+            case I_MASK_OFFSET: return emulator.interruptController.readMask();
+            case DPCR_OFFSET: return emulator.dma.getDPCR();
+            case DICR_OFFSET: return emulator.dma.getDICR();
+            case GPUREAD_OFFSET:
+                return 0;
+            case GPUSTAT_OFFSET:
+                return 0xFC000000;
             }
 
             throw new RuntimeException(String.format("Unimplemented readInt I/O offset 0x%04X", offset));
@@ -205,7 +312,16 @@ public class Memory {
             }
 
             switch (offset) {
-            case 0x2041:
+            case 0x2041: // POST
+                return;
+            case JOY_DATA_OFFSET:
+                System.out.printf("Unimplemented JOY_DATA writeByte %02X\n", (int)value & 0xFF);
+                return;
+            case CDROM_ADDRESS_OFFSET:
+            case CDROM_COMMAND_OFFSET:
+            case CDROM_PARAMETER_OFFSET:
+            case CDROM_HCHPCTL_OFFSET:
+                emulator.cdrom.write(offset - 0x1800, (int)value & 0xFF);
                 return;
             }
             throw new RuntimeException(String.format("Unimplemented writeByte I/O offset 0x%04X=%02X", offset, value & 0xFF));
@@ -218,22 +334,46 @@ public class Memory {
                 return;
             }
 
-            if (offset >= 0x1040 && offset <= 0x105F) {
+            if (offset >= 0x1100 && offset <= 0x1108 + 0x20) {
+                Timer.TimerData data = emulator.timer.getTimer((offset - 0x1100) / 0x10);
+                switch (offset & 0xF) {
+                case 0:
+                    data.writeValue((int)value & 0xFFFF);
+                    return;
+                case 4:
+                    data.writeMode((int)value & 0xFFFF);
+                    return;
+                case 8:
+                    data.writeTarget((int)value & 0xFFFF);
+                    return;
+                }
+            }
+
+            if (offset >= 0x1C00 && offset <= 0x1FFF) {
+                // System.out.printf("Unimplemented SPU writeShort 0x1F80%04X=%04X\n", offset, value);
                 return;
             }
 
             switch (offset) {
-            case 0x1070:
-            case 0x1074:
+            case JOY_MODE_OFFSET:
+                System.out.printf("Unimplemented JOY_MODE writeShort %04X\n", (int)value & 0xFFFF);
+                return;
+            case JOY_CTRL_OFFSET:
+                System.out.printf("Unimplemented JOY_CTRL writeShort %04X\n", (int)value & 0xFFFF);
+                return;
+            case JOY_BAUD_OFFSET:
+                System.out.printf("Unimplemented JOY_BAUD writeShort %04X\n", (int)value & 0xFFFF);
+                return;
+            case I_STAT_OFFSET:
+                emulator.interruptController.writeStatus(emulator.interruptController.readStatus() & value);
+                emulator.interruptController.acknowledge();
+                return;
+            case I_MASK_OFFSET:
+                emulator.interruptController.writeMask((int)value & 0xFFFF);
+                emulator.interruptController.acknowledge();
                 return;
             }
 
-            if (offset >= 0x1100 && offset <= 0x112F) { // Timer
-                return;
-            }
-
-            if (offset >= 0x1C00 && offset < 0x2000) // SPU
-                return;
             throw new RuntimeException(String.format("Unimplemented writeShort I/O offset 0x%04X=%04X", offset, value & 0xFFFF));
         }
 
@@ -244,37 +384,72 @@ public class Memory {
                 return;
             }
 
+            if (offset >= 0x1080 && offset <= 0x10EF) {
+                int channelIndex = (offset - 0x1080) / 0x10;
+                DMA.Channel channel = emulator.dma.getChannel(channelIndex);
+
+                switch (offset & 0xF) {
+                case 0:
+                    channel.setBaseAddress(value);
+                    return;
+                case 4:
+                    channel.setBlockControl(value);
+                    return;
+                case 8:
+                    channel.setChannelControl(value);
+                    if ((value & (1 << 24)) != 0)
+                        emulator.dma.runChannel(channelIndex);
+                    return;
+                }
+            }
+
+            if (offset >= 0x1100 && offset <= 0x1108 + 0x20) {
+                Timer.TimerData data = emulator.timer.getTimer((offset - 0x1100) / 0x10);
+                switch (offset & 0xF) {
+                case 0:
+                    data.writeValue((int)value & 0xFFFF);
+                    return;
+                case 4:
+                    data.writeMode((int)value & 0xFFFF);
+                    return;
+                case 8:
+                    data.writeTarget((int)value & 0xFFFF);
+                    return;
+                }
+            }
+
             switch (offset) {
-            case 0x10E0:
-            case 0x10E4:
-            case 0x10E8:
-            case 0x10A8:
-            case 0x1814:
-            case 0x1810:
-            case 0x10F0:
-            case 0x1118:
-            case 0x1114:
-            case 0x10F4:
-            case 0x10A0:
-            case 0x10A4:
-                return;
-            case PSXIntegerConstants.EXPANSION_3_DELAY_SIZE_OFFSET:
-            case PSXIntegerConstants.CDROM_DELAY_OFFSET:
-            case PSXIntegerConstants.SPU_DELAY_OFFSET:
-            case PSXIntegerConstants.EXPANSION_1_DELAY_SIZE_OFFSET:
-            case PSXIntegerConstants.EXPANSION_2_DELAY_SIZE_OFFSET:
-            case PSXIntegerConstants.EXPANSION_1_BASE_ADDRESS_OFFSET:
-            case PSXIntegerConstants.EXPANSION_2_BASE_ADDRESS_OFFSET:
-            case PSXIntegerConstants.COMMON_DELAY_OFFSET:
-            case PSXIntegerConstants.RAM_SIZE_OFFSET:
-            case PSXIntegerConstants.BIOS_ROM_DELAY_OFFSET:
+            case EXPANSION_1_BASE_ADDRESS_OFFSET:
+            case EXPANSION_2_BASE_ADDRESS_OFFSET:
+            case EXPANSION_1_DELAY_OFFSET:
+            case EXPANSION_3_DELAY_OFFSET:
+            case EXPANSION_2_DELAY_OFFSET:
+            case BIOS_ROM_DELAY_OFFSET:
+            case SPU_DELAY_OFFSET:
+            case CDROM_DELAY_OFFSET:
+            case COMMON_DELAY_OFFSET:
+            case RAM_SIZE_OFFSET:
+                System.out.printf("Unimplemented MEMORY CONTROL writeInt 0x1F80%04X = %08X\n", offset, value);
                 return;
 
-            case PSXIntegerConstants.I_STAT_OFFSET:
-            case PSXIntegerConstants.I_MASK_OFFSET:
-                // System.out.println("Interrupt write " + value);
+            // Interrupts
+            case I_STAT_OFFSET:
+                emulator.interruptController.writeStatus(emulator.interruptController.readStatus() & value);
+                emulator.interruptController.acknowledge();
+                return;
+            case I_MASK_OFFSET:
+                emulator.interruptController.writeMask((int)value & 0xFFFF);
+                emulator.interruptController.acknowledge();
+                return;
+
+            case DPCR_OFFSET: emulator.dma.setDPCR(value); return;
+            case DICR_OFFSET: emulator.dma.setDICR(value); return;
+            case GP0_COMMAND_OFFSET:
+                return;
+            case GP1_COMMAND_OFFSET:
                 return;
             }
+
             throw new RuntimeException(String.format("Unimplemented writeInt I/O offset 0x%04X=%08X", offset, value));
         }
     }
@@ -355,7 +530,7 @@ public class Memory {
     private ExpansionRegion1 expansionRegion1;
     private Emulator emulator;
 
-    Memory(Emulator emu) {
+    public Memory(Emulator emu) {
         pageExecutor = new SoftwarePageExecutor[0x10000];
         ramDirectAccess = new RAMDirectAccess();
         mmioAccess = new MMIOAccessPage();
@@ -441,7 +616,7 @@ public class Memory {
         SoftwarePageExecutor exec = pageExecutor[address >>> 16];
 
         if (exec == null) {
-            throw new RuntimeException(String.format("Unknown writeInt address %08X value %08X PC %08X", address, value, emulator.getCpu().PC));
+            throw new RuntimeException(String.format("Unknown writeInt address %08X value %08X PC %08X", address, value, emulator.mips.PC));
         }
         exec.writeInt(address & exec.getAddressMask(), value);
     }
@@ -452,5 +627,14 @@ public class Memory {
     
     public byte[] getRamData() {
         return ramDirectAccess.ram;
+    }
+    
+    public void dumpRam(String path) {
+        try (RandomAccessFile file = new RandomAccessFile(path, "w")) {
+            file.write(ramDirectAccess.ram);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 }
