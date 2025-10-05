@@ -247,6 +247,8 @@ public class MIPS {
         cop0reg[7].value = data;
     }
 
+    static int c = 0;
+
     private Instruction fetchInstruction() {
         int data = 0;
         if ((PC & 3) != 0) {
@@ -261,8 +263,7 @@ public class MIPS {
         } catch (Exception e) {
             triggerException(Exception_InstructionBusError);
             data = readInt(PC);
-        }
-
+        }        
         return new Instruction(data);
     }
 
@@ -277,14 +278,19 @@ public class MIPS {
         int bd = 0;
 
         if (exceptionCode == Exception_Interrupt) {
-            epc = PC;
             exceptionBranchDelay = true;
+            if (branchDelaySet) {
+                epc = PC - 4;
+            } else {
+                epc = PC;
+            }
+
             branchDelaySet = false;
         } else {
             if (branchDelaySet) {
                 exceptionBranchDelay = true;
                 branchDelaySet = false;
-                epc = PC;
+                epc = PC - 4;
                 bd = 0x80000000;
             } else {
                 epc = PC;
@@ -322,11 +328,15 @@ public class MIPS {
         return interruptOccured;
     }
 
-    static boolean once = true;
+    static public boolean once = true;
     static String test;
-    static int counter = 0;
+
     public void step() {
         switch (PC) {
+        case 0xbfc04dec:
+            // System.out.printf("%X %d\n", gpr[RA], getCyclesElapsed());
+            // System.exit(1);
+            break;
         case 0xB0:
             switch (gpr[9]) {
             case 0x3f:

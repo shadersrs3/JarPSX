@@ -54,7 +54,6 @@ public class Timer {
         }
 
         public void step() {
-            /*
             int value = currentValue;
             boolean resetCounterTarget = (mode & (1 << 3)) != 0;
             boolean irqTarget = (mode & (1 << 4)) != 0;
@@ -70,10 +69,6 @@ public class Timer {
                         System.exit(1);
                     }
                 }
-            }
-
-            if (clockSource != 0) {
-                System.out.printf("hello\n");
             }
 
             // currentValue = (currentValue + 1) & 0xFFFF;
@@ -96,7 +91,6 @@ public class Timer {
 
                 mode |= 1 << 11;
             }
-            */
         }
     }
 

@@ -13,7 +13,7 @@ public class DMA {
             blockControl = 0;
             channelControl = 0;
         }
-        
+
         public int getBaseAddress() {
             return baseAddress;
         }
@@ -51,7 +51,7 @@ public class DMA {
     private static final int TO_MAIN_RAM = 0;
 
     private Emulator emulator;
-    private int DPCR, DICR;
+    public int DPCR, DICR;
     private Channel[] channel;
     public DMA(Emulator emulator) {
         this.emulator = emulator;
@@ -199,11 +199,10 @@ public class DMA {
             System.exit(1);
         }
 
-        channel.channelControl &= ~(1 << 24);
-        if ((DICR & (1 << 23)) != 0 && (DICR & 0x7F0000) != 0) {
-            DICR |= index << 24;
-            DICR |= 1 << 31;
-            emulator.interruptController.service(InterruptController.IRQ_DMA);
+        if ((DICR & (1 << (index+16))) != 0) {
+            DICR |= 1 << (24+index);
         }
+
+        channel.channelControl &= ~(1 << 24);
     }
 }

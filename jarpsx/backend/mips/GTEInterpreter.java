@@ -696,6 +696,8 @@ public class GTEInterpreter {
         int cmd = gteInstruction.command();
         int sf = gteInstruction.sf();
         boolean lm = gteInstruction.lm();
+
+        // System.out.printf("GTE cmd %X\n", cmd);
         switch (cmd) {
         case 0x01: { // RTPS
             Vector tv = new Vector(mips, TRANSLATION_VECTOR);

@@ -239,8 +239,8 @@ public class Memory {
 
 
             switch (offset) {
-            case JOY_CTRL_OFFSET: System.out.printf("Unimplemented JOY_CTRL read16\n"); return (short)0;
-            case JOY_STAT_OFFSET: System.out.printf("Unimplemented JOY_STAT read16\n"); return (short)7;
+            case JOY_CTRL_OFFSET: System.out.printf("Unimplemented JOY_CTRL read16\n"); return (short)0xFFFF;
+            case JOY_STAT_OFFSET: System.out.printf("Unimplemented JOY_STAT read16\n"); return (short)0xFFFF;
             case I_STAT_OFFSET: return (short)emulator.interruptController.readStatus();
             case I_MASK_OFFSET: return (short)emulator.interruptController.readMask();
             }
@@ -391,16 +391,24 @@ public class Memory {
                 switch (offset & 0xF) {
                 case 0:
                     channel.setBaseAddress(value);
-                    return;
+                    break;
                 case 4:
                     channel.setBlockControl(value);
-                    return;
+                    break;
                 case 8:
                     channel.setChannelControl(value);
                     if ((value & (1 << 24)) != 0)
                         emulator.dma.runChannel(channelIndex);
-                    return;
+                    break;
                 }
+
+                if (((emulator.dma.DICR & (1 << 23)) != 0 && ((emulator.dma.DICR & 0x7F0000) != 0 && (emulator.dma.DICR & 0x7F000000) != 0))) {
+                    emulator.dma.DICR |= 1 << 31;
+                    emulator.interruptController.service(InterruptController.IRQ_DMA);
+                } else {
+                    emulator.dma.DICR &= ~(1 << 31);
+                }
+                return;
             }
 
             if (offset >= 0x1100 && offset <= 0x1108 + 0x20) {
@@ -429,7 +437,7 @@ public class Memory {
             case CDROM_DELAY_OFFSET:
             case COMMON_DELAY_OFFSET:
             case RAM_SIZE_OFFSET:
-                System.out.printf("Unimplemented MEMORY CONTROL writeInt 0x1F80%04X = %08X\n", offset, value);
+                // System.out.printf("Unimplemented MEMORY CONTROL writeInt 0x1F80%04X = %08X\n", offset, value);
                 return;
 
             // Interrupts
@@ -630,8 +638,9 @@ public class Memory {
     }
     
     public void dumpRam(String path) {
-        try (RandomAccessFile file = new RandomAccessFile(path, "w")) {
+        try (RandomAccessFile file = new RandomAccessFile(path, "rw")) {
             file.write(ramDirectAccess.ram);
+            file.close();
         } catch (Exception e) {
             e.printStackTrace();
         }

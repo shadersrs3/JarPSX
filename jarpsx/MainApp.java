@@ -11,6 +11,7 @@ public class MainApp {
         Emulator emu = new Emulator();
         try {
             emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\RidgeRacer\\ridgeracer.bin");
+            // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\cd\\hello_cd.bin");
             emu.loadBIOS(Paths.get("").toAbsolutePath().toString() + "\\data\\SCPH1001.BIN");
         } catch (Exception exception) {
             System.out.println("Can't load BIOS!");
@@ -21,7 +22,7 @@ public class MainApp {
 
         while (true) {
             long start = System.nanoTime();
-            emu.runFor(345000);
+            emu.runFor(345000/3);
             long end = System.nanoTime();
 
             long elapsedNanoseconds = end - start;

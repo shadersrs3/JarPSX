@@ -782,6 +782,51 @@ public class Interpreter {
         mips.PC += 4;
     }
 
+    private static void interpretLWC2(MIPS mips, Instruction instruction) {
+        int rt, rs, imm, address;
+
+        rt = instruction.rt();
+        rs = instruction.rs();
+        imm = instruction.signedImmediate();
+        address = mips.gpr[rs] + imm;
+
+        if ((address & 3) != 0) {
+            mips.triggerException(MIPS.Exception_AdEL);
+            return;
+        }
+
+        if ((mips.cop0reg[12].getValue() & 0x10000) != 0) {
+            mips.PC += 4;
+            return;
+        }
+
+        mips.gteReg[rt] = mips.readInt(address);
+        mips.PC += 4;
+    }
+
+    public static void interpretSWC2(MIPS mips, Instruction instruction) {
+        int rt, rs, imm, address, data;
+
+        rt = instruction.rt();
+        rs = instruction.rs();
+        imm = instruction.signedImmediate();
+        address = mips.gpr[rs] + imm;
+
+        if ((address & 3) != 0) {
+            mips.triggerException(MIPS.Exception_AdES);
+            return;
+        }
+
+        if ((mips.cop0reg[12].getValue() & 0x10000) != 0) {
+            mips.PC += 4;
+            return;
+        }
+
+        data = mips.gteReg[rt];
+        mips.writeInt(address, data);
+        mips.PC += 4;
+    }
+
     private static Execution getExecutor(Instruction instruction) {
         return opcodeExecutor[instruction.opcode()];
     }
@@ -797,7 +842,7 @@ public class Interpreter {
         }
         exec.execute(mips, instruction);
     }
-    
+        
     public static void initializeTable() {
         for (int i = 0; i < 0x40; i++) {
             opcodeExecutor[i] = functorExecutor[i] = null;
@@ -861,5 +906,7 @@ public class Interpreter {
         opcodeExecutor[0x2A] = Interpreter::interpretSWL;
         opcodeExecutor[0x2B] = Interpreter::interpretSW;
         opcodeExecutor[0x2E] = Interpreter::interpretSWR;
+        opcodeExecutor[0x32] = Interpreter::interpretLWC2;
+        opcodeExecutor[0x3A] = Interpreter::interpretSWC2;
     }
 }

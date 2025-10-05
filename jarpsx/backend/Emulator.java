@@ -163,7 +163,9 @@ public class Emulator {
         try {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
-                cdrom.step(1);
+                mips.step();
+                mips.step();
+                cdrom.step(3);
             }
 
             interruptController.service(InterruptController.IRQ_VBLANK);
@@ -172,7 +174,7 @@ public class Emulator {
 
             System.out.println("Stack trace and message: " + exception.getMessage());
             exception.printStackTrace();
-            
+            memory.dumpRam(Paths.get("").toAbsolutePath().toString() + "\\dump.ram");
             System.out.printf("\nPC %08X", mips.gpr[31]);
             System.exit(-1);
         }
