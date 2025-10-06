@@ -94,7 +94,7 @@ public class CDROM {
     private static final int StatusCode_Error = 1 << 0;
 
     private static final int[] NoDiskData = { 0x08, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-    private static final int[] LicensedMode2DataEurope = { 0x02, 0x00, 0x20, 0x00, (int)'A', (int)'N', (int)'A', (int)'L' };
+    private static final int[] LicensedMode2Data = { 0x02, 0x00, 0x20, 0x00, (int)'S', (int)'C', (int)'E', (int)'A' };
 
     private static final int NopAverage = 0xC4E1;
     private static final int InitAverage = 0x13CCE;
@@ -222,6 +222,7 @@ public class CDROM {
                     break;
                 case 0x9: // Pause
                     requestType = REQUEST_INT3_INT2_PAUSE;
+                    setDelay(30000);
                     break;
                 case 0x15: // SeekL
                     requestType = REQUEST_INT3_INT2_SEEKL;
@@ -342,7 +343,7 @@ public class CDROM {
             sectorOffset = 0;
             sectorLba++;
         }
-
+        
         if (sectorSizeMax == 0x924) {
             emulator.disk.readData(data, sectorLba * 0x930 + sectorOffset + 0xC, 4);
         } else {
@@ -382,7 +383,6 @@ public class CDROM {
             requestType = 0;
             break;
         case REQUEST_INT3_INT2:
-            
             parameterFifo.reset();
             responseFifo.reset();
             responseFifo.enqueue((1 << 1));
@@ -447,10 +447,10 @@ public class CDROM {
             setDelay(PauseSingleSpeed);
             break;
         case REQUEST_INT3_YYMMDDVER:
-            responseFifo.enqueue(0x94);
-            responseFifo.enqueue(0x09);
-            responseFifo.enqueue(0x19);
-            responseFifo.enqueue(0xC0);
+            responseFifo.enqueue(0x95);
+            responseFifo.enqueue(0x05);
+            responseFifo.enqueue(0x16);
+            responseFifo.enqueue(0xC1);
             doIrq(Int_Acknowledge);
             requestType = 0;
             break;
@@ -474,8 +474,8 @@ public class CDROM {
             requestType = 0;
             break;
         case REQUEST_INT2_GETID:
-            for (int i = 0; i < LicensedMode2DataEurope.length; i++)
-                responseFifo.enqueue(LicensedMode2DataEurope[i]);
+            for (int i = 0; i < LicensedMode2Data.length; i++)
+                responseFifo.enqueue(LicensedMode2Data[i]);
             doIrq(Int_Complete);
             HSTS &= ~(1 << 7);
             requestType = 0;

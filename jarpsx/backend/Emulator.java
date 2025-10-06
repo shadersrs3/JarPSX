@@ -29,6 +29,7 @@ public class Emulator {
     public Timer timer;
     public Scheduler scheduler;
     public Stats stats;
+    public GPU gpu;
     public Disk disk;
     private boolean error;
 
@@ -41,6 +42,7 @@ public class Emulator {
         timer = new Timer(this);
         dma = new DMA(this);
         cdrom = new CDROM(this);
+        gpu = new GPU(this);
         stats = new Stats();
         disk = new Disk();
 
@@ -163,12 +165,11 @@ public class Emulator {
         try {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
-                mips.step();
-                mips.step();
-                cdrom.step(3);
+                cdrom.step(1);
             }
 
             interruptController.service(InterruptController.IRQ_VBLANK);
+            gpu.present();
         } catch (Exception exception) {
             StackTraceElement[] elements = exception.getStackTrace();
 

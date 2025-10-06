@@ -153,7 +153,8 @@ public class DMA {
                 switch (transferDirection) {
                 case TO_MAIN_RAM:
                     switch (index) {
-                    case 2: // GPU (NEED TO IMPLEMENT)
+                    case 2: // GPU
+                        emulator.memory.writeInt(baseAddress, emulator.gpu.readGpuRead());
                         break;
                     default:
                         System.out.printf("Unimplemented Sync blocks (to Main Ram) DMA requests channel %d", index);
@@ -162,7 +163,8 @@ public class DMA {
                     break;
                 case FROM_MAIN_RAM:
                     switch (index) {
-                    case 2: // GPU (NEED TO IMPLEMENT)
+                    case 2: // GPU
+                        emulator.gpu.writeGp0(emulator.memory.readInt(baseAddress));
                         break;
                     default:
                         System.out.printf("Unimplemented Sync blocks (from Main Ram) DMA requests channel %d", index);
@@ -186,6 +188,7 @@ public class DMA {
 
                 // will send GP0 packets here later
                 for (int _baseAddress = (baseAddress + 4) & 0xFFFFFC, i = _baseAddress; i < _baseAddress+commandSize*4; i += 4) {
+                    emulator.gpu.writeGp0(emulator.memory.readInt(i));
                 }
 
                 if ((nextAddress & 0x800000) != 0)

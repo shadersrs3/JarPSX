@@ -239,8 +239,8 @@ public class Memory {
 
 
             switch (offset) {
-            case JOY_CTRL_OFFSET: System.out.printf("Unimplemented JOY_CTRL read16\n"); return (short)0xFFFF;
-            case JOY_STAT_OFFSET: System.out.printf("Unimplemented JOY_STAT read16\n"); return (short)0xFFFF;
+            case JOY_CTRL_OFFSET: System.out.printf("Unimplemented JOY_CTRL read16\n"); emulator.interruptController.service(InterruptController.IRQ_SIO); return (short)(3 << 8 | 1 << 0 | 1 << 2 | 1 << 10 | 1 << 11 | 1 << 12);
+            case JOY_STAT_OFFSET: System.out.printf("Unimplemented JOY_STAT read16\n"); emulator.interruptController.service(InterruptController.IRQ_SIO); return (short)(7 | 1 << 9);
             case I_STAT_OFFSET: return (short)emulator.interruptController.readStatus();
             case I_MASK_OFFSET: return (short)emulator.interruptController.readMask();
             }
@@ -297,9 +297,9 @@ public class Memory {
             case DPCR_OFFSET: return emulator.dma.getDPCR();
             case DICR_OFFSET: return emulator.dma.getDICR();
             case GPUREAD_OFFSET:
-                return 0;
+                return emulator.gpu.readGpuRead();
             case GPUSTAT_OFFSET:
-                return 0xFC000000;
+                return emulator.gpu.readGpuStat();
             }
 
             throw new RuntimeException(String.format("Unimplemented readInt I/O offset 0x%04X", offset));
@@ -315,7 +315,7 @@ public class Memory {
             case 0x2041: // POST
                 return;
             case JOY_DATA_OFFSET:
-                System.out.printf("Unimplemented JOY_DATA writeByte %02X\n", (int)value & 0xFF);
+                // System.out.printf("Unimplemented JOY_DATA writeByte %02X\n", (int)value & 0xFF);
                 return;
             case CDROM_ADDRESS_OFFSET:
             case CDROM_COMMAND_OFFSET:
@@ -356,10 +356,10 @@ public class Memory {
 
             switch (offset) {
             case JOY_MODE_OFFSET:
-                System.out.printf("Unimplemented JOY_MODE writeShort %04X\n", (int)value & 0xFFFF);
+                // System.out.printf("Unimplemented JOY_MODE writeShort %04X\n", (int)value & 0xFFFF);
                 return;
             case JOY_CTRL_OFFSET:
-                System.out.printf("Unimplemented JOY_CTRL writeShort %04X\n", (int)value & 0xFFFF);
+                // System.out.printf("Unimplemented JOY_CTRL writeShort %04X\n", (int)value & 0xFFFF);
                 return;
             case JOY_BAUD_OFFSET:
                 System.out.printf("Unimplemented JOY_BAUD writeShort %04X\n", (int)value & 0xFFFF);
@@ -452,10 +452,8 @@ public class Memory {
 
             case DPCR_OFFSET: emulator.dma.setDPCR(value); return;
             case DICR_OFFSET: emulator.dma.setDICR(value); return;
-            case GP0_COMMAND_OFFSET:
-                return;
-            case GP1_COMMAND_OFFSET:
-                return;
+            case GP0_COMMAND_OFFSET: emulator.gpu.writeGp0(value); return;
+            case GP1_COMMAND_OFFSET: emulator.gpu.writeGp1(value); return;
             }
 
             throw new RuntimeException(String.format("Unimplemented writeInt I/O offset 0x%04X=%08X", offset, value));

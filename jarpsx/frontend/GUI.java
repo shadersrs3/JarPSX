@@ -28,17 +28,26 @@ import javax.swing.event.*;
 
 import jarpsx.backend.Emulator;
 
-class GUI {
+public class GUI {
     private JFrame frame;
     private JFrame ttyLog;
     private JTextArea ttyLogTextArea;
     private JFrame cpuDebugger;
     private JPanel currentRegisterPanel;
 
-    public Emulator emulator;
+    private Emulator emulator;
     int ctr = 0;
 
-    private static final int WINDOW_WIDTH = 640, WINDOW_HEIGHT = 480;
+    private static final int WINDOW_WIDTH = 1024, WINDOW_HEIGHT = 512+(512-480);
+
+    public GUI(Emulator emulator) {
+        this.emulator = emulator;
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                showMainUI();
+            }
+        });
+    }
 
     class MinThumbScrollBarUI extends BasicScrollBarUI {
         private final Dimension minSize;
@@ -79,8 +88,8 @@ class GUI {
             
             g.setColor(new Color(100, 100, 255, 255));
             if (ctr < 100)
-                ttyLogTextArea.append(String.format("hello aaaaaaaaaaaaaaaaaaa %d\n", ++ctr));
-            
+                ttyLogTextArea.append(String.format("hello aaaaaaaaaaaaaaaaaaa %d\n", ++ctr)); 
+            g.drawImage(emulator.gpu.getVram(), 0, 0, null);
             g.drawString(String.format("Ran for %d secs", emulator.stats.microsecondsRan / 1000000), 5, currentLine);
             currentLine += NEWLINE;
             g.drawString(String.format("Emulator elapsed us: %.3fus", (float)emulator.stats.microsecondsRanPerFrame), 5, currentLine);
@@ -334,7 +343,7 @@ class GUI {
         menu.add(new JLabel("Copyright (C) shaders 2025 - JarPSX emulator"));
         menuBar.add(menu);
 
-        frame.setJMenuBar(menuBar);
+        frame.setJMenuBar(null);
         frame.setPreferredSize(new Dimension(WINDOW_WIDTH, WINDOW_HEIGHT));
         GamePanel gamePanel = new GamePanel();
         frame.add(gamePanel);
