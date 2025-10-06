@@ -2,7 +2,6 @@ package jarpsx.backend.component;
 
 import jarpsx.backend.Emulator;
 import jarpsx.backend.IDisk;
-import jarpsx.backend.component.CDROM;
 
 class Fifo {
     public class Data {
