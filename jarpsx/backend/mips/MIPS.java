@@ -258,12 +258,92 @@ public class MIPS {
             setEPC(address);
         }
 
+        switch (PC) {
+        case 0x8004F304:
+            //gpr[V0] = gpr[V1];
+            break;
+        case 0x8002E178:
+            //gpr[V0] = 0;
+            break;
+        case 0xbfc04dec:
+            // System.out.printf("%X %d\n", gpr[RA], getCyclesElapsed());
+            // System.exit(1);
+            break;
+        case 0xB0:
+            switch (gpr[9]) {
+            case 0x3f:
+                for (int i = 0; i < 2000; i++) {
+                    int addr = i + gpr[4];
+                    char _data = (char)readByte(addr);
+                    if (_data == '\0') {
+                        break;
+                    }
+
+                    System.out.printf("%c", _data);
+                }
+            case 0x3d:
+                if ((char)gpr[4] == '\n') {
+                    test = "";
+                } else {
+                    test += (char) gpr[4];
+                }
+                System.out.print((char)gpr[4]);
+                break;
+            }
+            break;
+        case 0x80030000:
+            try {
+                if (once == false) {
+                    // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\jakub\\gte\\test-all\\test-all.exe");
+                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\hello_cd.exe");
+                    once = true;
+
+                    String[] args = { "auto\0", "console\0", "release\0" };
+                    int argLen = 2;
+                    int len = 0;
+                    
+                    for (int i = 0; i < argLen; i++) {
+                        writeInt(0x1f800004+i*4, 0x1f800044+len);
+                    
+                        int x;
+                        int n = args[i].length();
+                        for (x = len; x < len + n; x++) {
+                            writeByte(0x1f800044 + x, (byte)args[i].charAt(x-len));
+                        }
+                        
+                        len = x;
+                    }
+
+                    writeInt(0x1f800000, argLen);
+                }
+            } catch (Exception e) {
+                System.out.println("Exception occured: " + e.getMessage());
+            }
+            break;
+        case 0x8004F1A0:
+            //System.out.printf("%X: V1 %X\n", PC, gpr[V1]);
+            break;
+        case 0x8004F1A8:
+            //System.out.printf("%X: V0 %X V1 address %08X\n", PC, gpr[V0], gpr[V1] - 0x1a4c);
+            break;
+        case 0x8004F1B0:
+            //System.out.printf("%X: V0 %X - V1 %08X\n", PC, gpr[V0], gpr[V1]);
+            break;
+        case 0x8004F1D4:
+            // System.exit(1);
+            break;
+        }
+
         try {
             data = readInt(PC);
         } catch (Exception e) {
             triggerException(Exception_InstructionBusError);
             data = readInt(PC);
-        }        
+        }
+
+        if (getCyclesElapsed() >= 0x100A26E8) {
+            // System.out.printf("%X %s\n", PC, Disassembler.disassemble(data, PC, true));
+        }
         return new Instruction(data);
     }
 
@@ -332,64 +412,6 @@ public class MIPS {
     static String test;
 
     public void step() {
-        switch (PC) {
-        case 0xbfc04dec:
-            // System.out.printf("%X %d\n", gpr[RA], getCyclesElapsed());
-            // System.exit(1);
-            break;
-        case 0xB0:
-            switch (gpr[9]) {
-            case 0x3f:
-                for (int i = 0; i < 2000; i++) {
-                    int addr = i + gpr[4];
-                    char data = (char)readByte(addr);
-                    if (data == '\0') {
-                        break;
-                    }
-
-                    System.out.printf("%c", data);
-                }
-            case 0x3d:
-                if ((char)gpr[4] == '\n') {
-                    test = "";
-                } else {
-                    test += (char) gpr[4];
-                }
-                System.out.print((char)gpr[4]);
-                break;
-            }
-            break;
-        case 0x80030000:
-            try {
-                if (once == false) {
-                    // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\jakub\\gte\\test-all\\test-all.exe");
-                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\hello_cd.exe");
-                    once = true;
-
-                    String[] args = { "auto\0", "console\0", "release\0" };
-                    int argLen = 2;
-                    int len = 0;
-                    
-                    for (int i = 0; i < argLen; i++) {
-                        writeInt(0x1f800004+i*4, 0x1f800044+len);
-                    
-                        int x;
-                        int n = args[i].length();
-                        for (x = len; x < len + n; x++) {
-                            writeByte(0x1f800044 + x, (byte)args[i].charAt(x-len));
-                        }
-                        
-                        len = x;
-                    }
-
-                    writeInt(0x1f800000, argLen);
-                }
-            } catch (Exception e) {
-                System.out.println("Exception occured: " + e.getMessage());
-            }
-            break;
-        }
-
         boolean interruptOccured = checkForInterrupts();
         boolean previousWriteToSR = this.previousWriteToSR == true;
         boolean branchDelaySet = this.branchDelaySet == true;

@@ -93,7 +93,7 @@ public class CDROM {
     private static final int StatusCode_Error = 1 << 0;
 
     private static final int[] NoDiskData = { 0x08, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-    private static final int[] LicensedMode2Data = { 0x02, 0x00, 0x20, 0x00, (int)'S', (int)'C', (int)'E', (int)'A' };
+    private static final int[] LicensedMode2Data = { 0x02, 0x00, 0x20, 0x00, (int)'S', (int)'C', (int)'E', (int)'E' };
 
     private static final int NopAverage = 0xC4E1;
     private static final int InitAverage = 0x13CCE;
@@ -120,6 +120,9 @@ public class CDROM {
     private static final int REQUEST_INT2_INIT = 13;
     private static final int REQUEST_INT2_PAUSE = 14;
     private static final int REQUEST_INT1_REQUEST = 15;
+    private static final int REQUEST_INT3_GETTN = 16;
+    private static final int REQUEST_INT3_GETTD = 17;
+
     private Emulator emulator;
     private int currentRegisterBank;
     private int HSTS;
@@ -221,6 +224,14 @@ public class CDROM {
                     break;
                 case 0x9: // Pause
                     requestType = REQUEST_INT3_INT2_PAUSE;
+                    setDelay(30000);
+                    break;
+                case 0x13: // GetTN
+                    requestType = REQUEST_INT3_GETTN;
+                    setDelay(30000);
+                    break;
+                case 0x14:
+                    requestType = REQUEST_INT3_GETTD;
                     setDelay(30000);
                     break;
                 case 0x15: // SeekL
@@ -485,6 +496,34 @@ public class CDROM {
             setDelay(0x21820);
             requestType = REQUEST_INT2;
             break;
+        case REQUEST_INT3_GETTN:
+            responseFifo.enqueue(readStatusCode());
+            responseFifo.enqueue(0x01);
+            responseFifo.enqueue(0x14);
+            doIrq(Int_Acknowledge);
+            requestType = 0;
+            break;
+        case REQUEST_INT3_GETTD: {
+            int track = parameterFifo.fetch().data;
+
+            responseFifo.enqueue(readStatusCode());
+            switch (track) {
+            case 0:
+                responseFifo.enqueue(0);
+                responseFifo.enqueue(0);
+                break;
+            case 2:
+                responseFifo.enqueue(0);
+                responseFifo.enqueue(0);
+                break;
+            default:
+                System.out.printf("Unimplemented GetTd track %d\n", track);
+                System.exit(1);
+            }
+            doIrq(Int_Acknowledge);
+            requestType = 0;
+            break;
+        }
         }
     }
 }

@@ -201,8 +201,10 @@ public class Memory {
                 return scratchpad[offset];
             }
 
-            if (offset >= 0x1040 && offset <= 0x105F) {
-                return 0;
+            if (offset >= 0x1040 && offset <= 0x104E) {
+                switch (offset) {
+                case 0x1040: return (byte)emulator.peripheral.readSioRxData(0);
+                }
             }
 
             switch (offset) {
@@ -228,6 +230,16 @@ public class Memory {
                 return 0;
             }
 
+            if (offset >= 0x1040 && offset <= 0x104E) {
+                switch (offset) {
+                case 0x1040: return (short)emulator.peripheral.readSioRxData(0);
+                case 0x1044: return (short)emulator.peripheral.readSioStat(0);
+                case 0x1048: return (short)emulator.peripheral.readSioMode(0);
+                case 0x104A: return (short)emulator.peripheral.readSioCtrl(0);
+                case 0x104E: return (short)emulator.peripheral.readSioBaudRate(0);
+                }
+            }
+
             if (offset >= 0x1100 && offset <= 0x1108 + 0x20) {
                 Timer.TimerData data = emulator.timer.getTimer((offset - 0x1100) / 0x10);
                 switch (offset & 0xF) {
@@ -239,8 +251,6 @@ public class Memory {
 
 
             switch (offset) {
-            case JOY_CTRL_OFFSET: System.out.printf("Unimplemented JOY_CTRL read16\n"); emulator.interruptController.service(InterruptController.IRQ_SIO); return (short)(3 << 8 | 1 << 0 | 1 << 2 | 1 << 10 | 1 << 11 | 1 << 12);
-            case JOY_STAT_OFFSET: System.out.printf("Unimplemented JOY_STAT read16\n"); emulator.interruptController.service(InterruptController.IRQ_SIO); return (short)(7 | 1 << 9);
             case I_STAT_OFFSET: return (short)emulator.interruptController.readStatus();
             case I_MASK_OFFSET: return (short)emulator.interruptController.readMask();
             }
@@ -277,7 +287,7 @@ public class Memory {
                 case 8: return data.readTarget();
                 }
             }
-
+            
             switch (offset) {
             case EXPANSION_2_DELAY_OFFSET:
                 return 0;
@@ -299,6 +309,7 @@ public class Memory {
             case GPUREAD_OFFSET:
                 return emulator.gpu.readGpuRead();
             case GPUSTAT_OFFSET:
+
                 return emulator.gpu.readGpuStat();
             }
 
@@ -311,11 +322,16 @@ public class Memory {
                 return;
             }
 
+            if (offset >= 0x1040 && offset <= 0x104E) {
+                switch (offset) {
+                case 0x1040:
+                    emulator.peripheral.writeSioTxData(0, (int)value & 0xFF);
+                    return;
+                }
+            }
+
             switch (offset) {
             case 0x2041: // POST
-                return;
-            case JOY_DATA_OFFSET:
-                // System.out.printf("Unimplemented JOY_DATA writeByte %02X\n", (int)value & 0xFF);
                 return;
             case CDROM_ADDRESS_OFFSET:
             case CDROM_COMMAND_OFFSET:
@@ -332,6 +348,15 @@ public class Memory {
                 writeByte(offset, (byte)(value & 0xFF));
                 writeByte(offset + 1, (byte)(value >>> 8));
                 return;
+            }
+
+            if (offset >= 0x1040 && offset <= 0x104E) {
+                switch (offset) {
+                case 0x1040: emulator.peripheral.writeSioTxData(0, (int)value & 0xFFFF); return;
+                case 0x1048: emulator.peripheral.writeSioMode(0, (int)value & 0xFFFF); return;
+                case 0x104A: emulator.peripheral.writeSioCtrl(0, (int)value & 0xFFFF); return;
+                case 0x104E: emulator.peripheral.writeSioBaudRate(0, (int)value & 0xFFFF); return;
+                }
             }
 
             if (offset >= 0x1100 && offset <= 0x1108 + 0x20) {
@@ -355,15 +380,6 @@ public class Memory {
             }
 
             switch (offset) {
-            case JOY_MODE_OFFSET:
-                // System.out.printf("Unimplemented JOY_MODE writeShort %04X\n", (int)value & 0xFFFF);
-                return;
-            case JOY_CTRL_OFFSET:
-                // System.out.printf("Unimplemented JOY_CTRL writeShort %04X\n", (int)value & 0xFFFF);
-                return;
-            case JOY_BAUD_OFFSET:
-                System.out.printf("Unimplemented JOY_BAUD writeShort %04X\n", (int)value & 0xFFFF);
-                return;
             case I_STAT_OFFSET:
                 emulator.interruptController.writeStatus(emulator.interruptController.readStatus() & value);
                 emulator.interruptController.acknowledge();

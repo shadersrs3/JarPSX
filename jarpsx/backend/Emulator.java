@@ -43,6 +43,7 @@ public class Emulator {
         dma = new DMA(this);
         cdrom = new CDROM(this);
         gpu = new GPU(this);
+        peripheral = new Peripheral(this);
         stats = new Stats();
         disk = new Disk();
 
@@ -162,9 +163,11 @@ public class Emulator {
     }
     
     public void runFor(int cycles) {
+        int _cycles = 0;
         try {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
+                timer.step();
                 cdrom.step(1);
             }
 

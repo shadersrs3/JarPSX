@@ -19,6 +19,7 @@ public class GPU {
     public static final int MEMORY_TRANSFER_VRAM_TO_VRAM = 0b100;
     public static final int MEMORY_TRANSFER_CPU_TO_VRAM = 0b101;
     public static final int MEMORY_TRANSFER_VRAM_TO_CPU = 0b110;
+    public static final int MEMORY_TRANSFER_FILL_VRAM = 69;
 
     private int[] vramData;
     public int texpage;
@@ -37,11 +38,13 @@ public class GPU {
     public int drawingAreaY2;
 
     public PolygonInfo currentPolygonInfo;
+    public RectangleInfo currentRectangleInfo;
     public int currentState;
     public int currentRenderCount;
     public int color;
     public int vertex;
     public int uv;
+    public int rectangleWidth, rectangleHeight;
 
     public int destinationCoord;
     public int sourceCoord;
@@ -91,7 +94,7 @@ public class GPU {
         boolean semiTransparent;
         boolean rawTexture;
         boolean fourVertices;
-        public int command;
+        int command;
         PolygonInfo(int data) {
             gouraudShading = ((data >>> 28) & 1) != 0;
             fourVertices = ((data >>> 27) & 1) != 0;
@@ -106,6 +109,38 @@ public class GPU {
         public void addPolygon(PolygonData data) {
             this.data[index] = data;
             index++;
+        }
+    }
+
+    private class Rectangle {
+        int color;
+        int width, height;
+        int uv;
+        Rectangle(int color, int width, int height, int uv) {
+            this.color = color;
+            this.width = width;
+            this.height = height;
+            this.uv = uv;
+        }
+    }
+
+    private class RectangleInfo {
+        Rectangle data;
+        boolean textured;
+        boolean semiTransparent;
+        boolean rawTexture;
+        int size;
+        int command;
+        RectangleInfo(int data) {
+            size = ((data >>> 27) & 3);
+            textured = ((data >>> 26) & 1) != 0;
+            semiTransparent = ((data >>> 25) & 1) != 0;
+            rawTexture = ((data >>> 24) & 1) != 0;
+            command = data >>> 24;
+        }
+
+        public void addRectangle(Rectangle data) {
+            this.data = data;
         }
     }
 
@@ -137,13 +172,31 @@ public class GPU {
         int color = 0;
         int paletteAddressX = (clutAttribute & 0x3F);
         int paletteAddressY = (clutAttribute >>> 6) & 511;
+        int textureAddressY;
+        int textureAddressX;
+        int word;
+        int paletteIndex;
+
         switch (pageColor) {
         case 0:
-            int textureAddressY = texPageY + v;
-            int textureAddressX = texPageX + (u >> 2);
-            int word = readVram16(textureAddressX, textureAddressY);
-            int paletteIndex = (word >>> ((u & 3) * 4)) & 0xF;
+            textureAddressY = texPageY + v;
+            textureAddressX = texPageX + (u >> 2);
+            word = readVram16(textureAddressX, textureAddressY);
+            paletteIndex = (word >>> ((u & 3) * 4)) & 0xF;
             color = readVram16(paletteAddressX * 16 + paletteIndex, paletteAddressY);
+            break;
+        case 1:
+            textureAddressY = texPageY + v;
+            textureAddressX = texPageX + (u >> 1);
+            word = readVram16(textureAddressX, textureAddressY);
+            paletteIndex = (word >>> ((u & 1) * 8)) & 0xFF;
+            color = readVram16(paletteAddressX * 16 + paletteIndex, paletteAddressY);
+            break;
+        case 2:
+        case 3:
+            textureAddressY = texPageY + v;
+            textureAddressX = texPageX + u;
+            color = readVram16(textureAddressX, textureAddressY);
             break;
         default:
             System.out.printf("Unimplemented page color %X\n", pageColor);
@@ -377,6 +430,8 @@ public class GPU {
         default:
             dma |= (1 << 26) | (1 << 27) | (1 << 28);
         }
+
+        dma |= 1 << 31;
         return (texpage & 0x3FF) | dmaDirection << 29 | dma;
     }
     
@@ -389,9 +444,10 @@ public class GPU {
                 vramToCpuCurrentXPosition = vramToCpuInitialXPosition;
                 ++vramToCpuCurrentYPosition;
             }
+
+            if (vramToCpuSizeDecrement == 0)
+                renderType = 0;
             return data;
-        } else {
-            renderType = 0;
         }
 
         return GPUREAD;
@@ -402,6 +458,7 @@ public class GPU {
 
         switch (renderType) {
         case RENDER_POLYGON:
+            // System.out.printf("Render polygon\n");
             int renderCount = currentRenderCount;
             switch (currentState) {
             case 1:
@@ -542,6 +599,49 @@ public class GPU {
             }
             }
             return;
+        case MEMORY_TRANSFER_FILL_VRAM:
+            switch (currentState) {
+            case 1:
+                currentState = 2;
+                break;
+            case 2:
+                renderType = 0;
+                break;
+            }
+            break;
+        case RENDER_RECTANGLE: {
+            boolean ableToDraw = false;
+            switch (currentState) {
+            case 1:
+                vertex = data;
+                if (currentRectangleInfo.textured) {
+                    currentState = 2;
+                } else {
+                    if (currentRectangleInfo.size == 0) {
+                        currentState = 3;
+                    } else {
+                        ableToDraw = true;
+                    }
+                }
+                break;
+            case 2:
+                if (currentRectangleInfo.size != 0) {
+                    ableToDraw = true;
+                } else {
+                    currentState = 3;
+                }
+                break;
+            case 3:
+                ableToDraw = true;
+                break;
+            }
+            
+            if (ableToDraw) {
+                // System.out.printf("UNIMPLEMENTED DRAW RECTANGLE\n");
+                renderType = 0;
+            }
+            return;
+        }
         }
 
         switch (data >>> 29) {
@@ -556,6 +656,11 @@ public class GPU {
             currentState = 1;
             this.renderType = RENDER_POLYGON;
             color = data & 0xFFFFFF;
+            return;
+        case RENDER_RECTANGLE:
+            this.renderType = RENDER_RECTANGLE;
+            currentRectangleInfo = new RectangleInfo(data);
+            currentState = 1;
             return;
         case MEMORY_TRANSFER_CPU_TO_VRAM:
             this.renderType = MEMORY_TRANSFER_CPU_TO_VRAM;
@@ -572,6 +677,11 @@ public class GPU {
         }
 
         switch (command) {
+        case 0x02:
+            renderType = MEMORY_TRANSFER_FILL_VRAM;
+            currentState = 1;
+            break;
+        case 0x0C:
         case 0x00: // nop
             break;
         case 0x01:
@@ -599,7 +709,7 @@ public class GPU {
             break;
         default:
             System.out.printf("Unimplemented GP0 command %02X\n", command);
-            System.exit(1);
+            //System.exit(1);
         }
     }
     

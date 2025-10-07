@@ -18,7 +18,7 @@ public class Timer {
         }
 
         public int readValue() {
-            return currentValue;
+            return (currentValue / 8) & 0xFFFF;
         }
 
         public int readMode() {
@@ -71,7 +71,7 @@ public class Timer {
                 }
             }
 
-            // currentValue = (currentValue + 1) & 0xFFFF;
+            this.currentValue = (this.currentValue + 1);
             if (value == 0xFFFF) {
                 if (irqFFFF) {
                     triggerInterrupt();
