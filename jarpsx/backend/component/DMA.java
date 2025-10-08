@@ -166,6 +166,8 @@ public class DMA {
                     case 2: // GPU
                         emulator.gpu.writeGp0(emulator.memory.readInt(baseAddress));
                         break;
+                    case 4: // SPU (NEED TO IMPLEMENT)
+                        break;
                     default:
                         System.out.printf("Unimplemented Sync blocks (from Main Ram) DMA requests channel %d", index);
                         System.exit(1);
@@ -202,10 +204,7 @@ public class DMA {
             System.exit(1);
         }
 
-        if ((DICR & (1 << (index+16))) != 0) {
-            DICR |= 1 << (24+index);
-        }
-
+        DICR |= 1 << (24 + index);
         channel.channelControl &= ~(1 << 24);
     }
 }

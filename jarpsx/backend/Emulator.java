@@ -168,10 +168,12 @@ public class Emulator {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
                 timer.step();
-                cdrom.step(1);
+                cdrom.step(4);
+                if ((mips.getCyclesElapsed() % 345000) == 0) {
+                    interruptController.service(InterruptController.IRQ_VBLANK);
+                }
             }
 
-            interruptController.service(InterruptController.IRQ_VBLANK);
             gpu.present();
         } catch (Exception exception) {
             StackTraceElement[] elements = exception.getStackTrace();

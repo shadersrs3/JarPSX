@@ -495,6 +495,6 @@ public class GUI {
         cpuDebugger.setPreferredSize(new Dimension(720, 720+160));
         cpuDebugger.setMinimumSize(new Dimension(720, 720+160));
         cpuDebugger.pack();
-        cpuDebugger.setVisible(true);
+        cpuDebugger.setVisible(false);
     }
 }

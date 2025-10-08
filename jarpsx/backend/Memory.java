@@ -225,8 +225,7 @@ public class Memory {
                 return (short) result;
             }
 
-            if (offset >= 0x1C00 && offset <= 0x1FFF) {
-                // System.out.printf("Unimplemented SPU readShort 0x1F80%04X\n", offset);
+            if (offset >= 0x1C00 && offset <= 0x1FFF) {                
                 return 0;
             }
 
@@ -258,6 +257,7 @@ public class Memory {
             throw new RuntimeException(String.format("Unimplemented readShort I/O offset 0x%04X", offset));
         }
 
+        static int ctr;
         public int readInt(int offset) {
             if (offset >= 0 && offset < 0x400) {
                 int result = ((int)readShort(offset) & 0xFFFF) | (int)readShort(offset + 2) << 16;
@@ -413,7 +413,7 @@ public class Memory {
                     break;
                 case 8:
                     channel.setChannelControl(value);
-                    if ((value & (1 << 24)) != 0)
+                    if ((value & (1 << 28)) != 0 || (value & (1 << 24)) != 0)
                         emulator.dma.runChannel(channelIndex);
                     break;
                 }

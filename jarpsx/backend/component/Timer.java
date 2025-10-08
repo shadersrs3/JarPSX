@@ -6,10 +6,11 @@ import jarpsx.backend.component.InterruptController;
 public class Timer {
     public class TimerData {
         private int currentValue;
+        private int _value;
         private int mode;
         private int targetValue;
         private int counterIndex;
-
+        boolean once = false;
         public TimerData(int counter) {
             counterIndex = counter;
             targetValue = 0;
@@ -18,7 +19,7 @@ public class Timer {
         }
 
         public int readValue() {
-            return (currentValue / 8) & 0xFFFF;
+            return currentValue & 0xFFFF;
         }
 
         public int readMode() {
@@ -37,6 +38,7 @@ public class Timer {
 
         public void writeMode(int mode) {
             this.mode = mode & 0xFFFF;
+            once = false;
         }
 
         public void writeTarget(int target) {
@@ -46,15 +48,14 @@ public class Timer {
         public void triggerInterrupt() {
             mode &= ~(1 << 10);
             if ((mode & (1 << 6)) == 0) {
-                System.out.printf("irq once interrupt");
-                System.exit(1);
+                once = true;
             }
 
             emulator.interruptController.service(InterruptController.IRQ_TMR0 + counterIndex);
         }
 
         public void step() {
-            int value = currentValue;
+            int value = readValue();
             boolean resetCounterTarget = (mode & (1 << 3)) != 0;
             boolean irqTarget = (mode & (1 << 4)) != 0;
             boolean irqFFFF = (mode & (1 << 5)) != 0;
@@ -71,24 +72,25 @@ public class Timer {
                 }
             }
 
-            this.currentValue = (this.currentValue + 1);
+            _value += 1;
+            currentValue = (_value / 8) & 0xFFFF;
             if (value == 0xFFFF) {
                 if (irqFFFF) {
                     triggerInterrupt();
                 }
-                
+
                 mode |= 1 << 12;
+                currentValue = 0;
             }
 
             if (value == targetValue) {
                 if (resetCounterTarget) {
-                    currentValue = 0;
+                    _value = 0;
                 }
 
                 if (irqTarget) {
                     triggerInterrupt();
                 }
-
                 mode |= 1 << 11;
             }
         }

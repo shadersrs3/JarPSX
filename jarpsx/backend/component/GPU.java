@@ -112,35 +112,23 @@ public class GPU {
         }
     }
 
-    private class Rectangle {
-        int color;
-        int width, height;
-        int uv;
-        Rectangle(int color, int width, int height, int uv) {
-            this.color = color;
-            this.width = width;
-            this.height = height;
-            this.uv = uv;
-        }
-    }
-
     private class RectangleInfo {
-        Rectangle data;
         boolean textured;
         boolean semiTransparent;
         boolean rawTexture;
         int size;
         int command;
+        int vertex;
+        int color;
+        int width, height;
+        int uv;
+
         RectangleInfo(int data) {
             size = ((data >>> 27) & 3);
             textured = ((data >>> 26) & 1) != 0;
             semiTransparent = ((data >>> 25) & 1) != 0;
             rawTexture = ((data >>> 24) & 1) != 0;
             command = data >>> 24;
-        }
-
-        public void addRectangle(Rectangle data) {
-            this.data = data;
         }
     }
 
@@ -157,9 +145,9 @@ public class GPU {
     }
     
     public void drawPixel(int x, int y, int color) {
-        if (x < 0 || x >= drawingAreaX2 || x >= 1024)
+        if (x < drawingAreaX1 || x < 0 || x >= drawingAreaX2 || x >= 1024)
             return;
-        if (y < 0 || y >= drawingAreaY2 || y >= 512) {
+        if (y < drawingAreaY1 || y < 0 || y >= drawingAreaY2 || y >= 512) {
             return;
         }
 
@@ -179,23 +167,23 @@ public class GPU {
 
         switch (pageColor) {
         case 0:
-            textureAddressY = texPageY + v;
             textureAddressX = texPageX + (u >> 2);
+            textureAddressY = texPageY + v;
             word = readVram16(textureAddressX, textureAddressY);
             paletteIndex = (word >>> ((u & 3) * 4)) & 0xF;
             color = readVram16(paletteAddressX * 16 + paletteIndex, paletteAddressY);
             break;
         case 1:
-            textureAddressY = texPageY + v;
             textureAddressX = texPageX + (u >> 1);
+            textureAddressY = texPageY + v;
             word = readVram16(textureAddressX, textureAddressY);
             paletteIndex = (word >>> ((u & 1) * 8)) & 0xFF;
             color = readVram16(paletteAddressX * 16 + paletteIndex, paletteAddressY);
             break;
         case 2:
         case 3:
-            textureAddressY = texPageY + v;
             textureAddressX = texPageX + u;
+            textureAddressY = texPageY + v;
             color = readVram16(textureAddressX, textureAddressY);
             break;
         default:
@@ -339,6 +327,57 @@ public class GPU {
         }
     }
 
+    public void drawRectangle(RectangleInfo info) {
+        int texpageX = (texpage >>> 0) & 0xF;
+        int texpageY = (texpage >>> 4) & 0x1;
+        int colorDepth = (texpage >>> 7) & 3;
+
+        int vx = signExtend((short)(info.vertex & 0xFFFF));
+        int vy = signExtend((short)((info.vertex >>> 16) & 0xFFFF));
+        vx += drawOffsetX;
+        vy += drawOffsetY;
+
+        int width = info.width;
+        int height = info.height;
+        boolean transparent = false;
+        int red = info.color & 0xFF, green = (info.color >>> 8) & 0xFF, blue = (info.color >>> 16) & 0xFF;
+
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                int r = red;
+                int g = green;
+                int b = blue;
+                if (info.textured) {
+                    int color = lookupTexture(texpageX, texpageY, (info.uv & 0xFF) + i, ((info.uv >>> 8) & 0xFF) + j, colorDepth, info.uv >>> 16);
+                    r = (color & 0x1F) << 3;
+                    g = ((color >> 5) & 0x1F) << 3;
+                    b = ((color >> 10) & 0x1F) << 3;
+                    transparent = color == 0;
+                }
+
+                if (transparent == false) {
+                    r /= 8;
+                    g /= 8;
+                    b /= 8;
+                    int color = (r & 0x1F) | ((g & 0x1F) << 5) | ((b & 0x1F) << 10);
+                    drawPixel(vx+i, vy+j, color);
+                }
+            }
+        }
+    }
+
+    void fillRectangle(int x, int y, int width, int height, int color) {
+        int red = color & 0xFF, green = (color >>> 8) & 0xFF, blue = (color >>> 16) & 0xFF;
+        for (int j = 0; j < height; j++) {
+            for (int i = 0; i < width; i += 0x10) {
+                int r = red / 8, g = green / 8, b = blue / 8;
+                color = (r & 0x1F) | ((g & 0x1F) << 5) | ((b & 0x1F) << 10);
+                for (int n = 0; n < 0x10; n++)
+                    drawPixel(x+i+n, x+j, color);
+            }
+        }
+    }
+
     public void present() {
         int[] vramBuffer = ((DataBufferInt)vram.getRaster().getDataBuffer()).getData();
         for (int i = 0; i < 1024 * 512; i++) {
@@ -432,7 +471,14 @@ public class GPU {
         }
 
         dma |= 1 << 31;
-        return (texpage & 0x3FF) | dmaDirection << 29 | dma;
+        int horizontalResolution2 = (displayMode >>> 6) & 1;
+        int horizontalResolution1 = displayMode & 3;
+        int verticalResolution = (displayMode >>> 2) & 1;
+        int videoMode = (displayMode >>> 3) & 1;
+        int verticalInterlace = (displayMode >>> 5) & 1;
+        return (texpage & 0x3FF) | displayEnable << 23
+                | horizontalResolution2 << 16 | horizontalResolution1 << 17
+                | videoMode << 20 | verticalInterlace << 22 | dmaDirection << 29 | dma;
     }
     
     public int readGpuRead() {
@@ -602,18 +648,20 @@ public class GPU {
         case MEMORY_TRANSFER_FILL_VRAM:
             switch (currentState) {
             case 1:
+                vertex = data;
                 currentState = 2;
                 break;
             case 2:
+                fillRectangle((vertex & 0x3F0), (vertex >>> 16) & 0x1FF, ((data & 0x3FF) + 0xF) & ~0xF, (data >>> 16) & 0x1FF, color);
                 renderType = 0;
                 break;
             }
-            break;
+            return;
         case RENDER_RECTANGLE: {
             boolean ableToDraw = false;
             switch (currentState) {
             case 1:
-                vertex = data;
+                currentRectangleInfo.vertex = data;
                 if (currentRectangleInfo.textured) {
                     currentState = 2;
                 } else {
@@ -625,6 +673,7 @@ public class GPU {
                 }
                 break;
             case 2:
+                currentRectangleInfo.uv = data;
                 if (currentRectangleInfo.size != 0) {
                     ableToDraw = true;
                 } else {
@@ -632,12 +681,14 @@ public class GPU {
                 }
                 break;
             case 3:
+                currentRectangleInfo.width = data & 0xFFFF;
+                currentRectangleInfo.height = (data >>> 16);
                 ableToDraw = true;
                 break;
             }
             
             if (ableToDraw) {
-                // System.out.printf("UNIMPLEMENTED DRAW RECTANGLE\n");
+                drawRectangle(currentRectangleInfo);
                 renderType = 0;
             }
             return;
@@ -660,6 +711,22 @@ public class GPU {
         case RENDER_RECTANGLE:
             this.renderType = RENDER_RECTANGLE;
             currentRectangleInfo = new RectangleInfo(data);
+            switch (currentRectangleInfo.size) {
+            case 1:
+                currentRectangleInfo.width = 1;
+                currentRectangleInfo.height = 1;
+                break;
+            case 2:
+                currentRectangleInfo.width = 8;
+                currentRectangleInfo.height = 8;
+                break;
+            case 3:
+                currentRectangleInfo.width = 16;
+                currentRectangleInfo.height = 16;
+                break;
+            }
+
+            currentRectangleInfo.color = data & 0xFFFFFF;
             currentState = 1;
             return;
         case MEMORY_TRANSFER_CPU_TO_VRAM:
@@ -680,8 +747,8 @@ public class GPU {
         case 0x02:
             renderType = MEMORY_TRANSFER_FILL_VRAM;
             currentState = 1;
+            color = data & 0xFFFFFF;
             break;
-        case 0x0C:
         case 0x00: // nop
             break;
         case 0x01:
@@ -708,8 +775,8 @@ public class GPU {
             maskBitSetting = data;
             break;
         default:
-            System.out.printf("Unimplemented GP0 command %02X\n", command);
-            //System.exit(1);
+            System.out.printf("Unimplemented GP0 command %02X %08X\n", command, data);
+            // System.exit(1);
         }
     }
     
@@ -723,6 +790,7 @@ public class GPU {
             renderType = 0;
             break;
         case 0x02: // acknowledge irq gpustat relies on this
+            System.out.printf("acknowledge irq\n");
             break;
         case 0x03: // gpustat relies on this
             displayEnable = data & 1;

@@ -54,7 +54,7 @@ public class MIPS {
     public static final int SP = 29;
     public static final int FP = 30;
     public static final int RA = 31;
-
+    private Instruction currentInstruction;
     private Emulator emulator;
     private long cyclesElapsed;
     public int[] gpr;
@@ -118,8 +118,8 @@ public class MIPS {
         this.emulator = emulator;
         cyclesElapsed = 0L;
 
+        currentInstruction = new Instruction(0);
         cop0reg = new Cop0Register[64];
-
         cop0reg[3] = new Cop0Register("BPC", 0, 3);
         cop0reg[5] = new Cop0Register("BDA", 0, 5);
         cop0reg[6] = new Cop0Register("TAR", 0, 6);
@@ -214,6 +214,9 @@ public class MIPS {
     }
 
     public void writeInt(int address, int value) {
+        if (address == 0x8005cfa8) {
+            System.out.printf("Write to %08X with %08X PC %08X %d\n", address, value, PC, getCyclesElapsed());
+        }
         emulator.memory.writeInt(address, value);
     }
 
@@ -247,8 +250,6 @@ public class MIPS {
         cop0reg[7].value = data;
     }
 
-    static int c = 0;
-
     private Instruction fetchInstruction() {
         int data = 0;
         if ((PC & 3) != 0) {
@@ -281,12 +282,14 @@ public class MIPS {
 
                     System.out.printf("%c", _data);
                 }
+                break;
             case 0x3d:
                 if ((char)gpr[4] == '\n') {
                     test = "";
                 } else {
                     test += (char) gpr[4];
                 }
+                
                 System.out.print((char)gpr[4]);
                 break;
             }
@@ -341,10 +344,39 @@ public class MIPS {
             data = readInt(PC);
         }
 
-        if (getCyclesElapsed() >= 0x100A26E8) {
-            // System.out.printf("%X %s\n", PC, Disassembler.disassemble(data, PC, true));
+        final long _testCycles = 234374317;
+        if (getCyclesElapsed() >= _testCycles - 1000 && getCyclesElapsed() <= _testCycles + 2000) {
+            // System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
         }
-        return new Instruction(data);
+
+        if (getCyclesElapsed() >= 352376644 + 200_000_000) {
+            switch (PC) {
+            case 0x80013780:
+                // gpr[V0] = 0;
+                // System.out.printf("%d < %d\n", gpr[S0], gpr[V0]);
+                break;
+            }
+
+        } /*else if (getCyclesElapsed() >= 561866739 + 50_000_000 && getCyclesElapsed() <= 561866739 + 250_020_000) {
+            switch (PC) {
+            case 0x8003E6BC:
+                gpr[V0] = 0;
+                break;
+            case 0x80032918:
+                gpr[V0] = 0;
+                break;
+            case 0x80040A3C:
+            case 0x800135F8:
+                gpr[V0] = 0;
+                break;
+            }
+
+            // System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
+        } else if (getCyclesElapsed() >= 561866739 + 205_000_000) {
+            System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
+        }*/
+        currentInstruction.setData(data);
+        return currentInstruction;
     }
 
     public void triggerException(int exceptionCode) {

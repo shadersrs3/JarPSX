@@ -93,7 +93,7 @@ public class CDROM {
     private static final int StatusCode_Error = 1 << 0;
 
     private static final int[] NoDiskData = { 0x08, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-    private static final int[] LicensedMode2Data = { 0x02, 0x00, 0x20, 0x00, (int)'S', (int)'C', (int)'E', (int)'E' };
+    private static final int[] LicensedMode2Data = { 0x02, 0x00, 0x20, 0x00, (int)'S', (int)'C', (int)'E', (int)'A' };
 
     private static final int NopAverage = 0xC4E1;
     private static final int InitAverage = 0x13CCE;
@@ -139,6 +139,8 @@ public class CDROM {
     private int requestType;
     private int sectorOffset;
     private boolean sectorEnd;
+    private int paused = 0;
+    boolean dataReady;
 
     private int readStatusCode() {
         return statusCode | StatusCode_Motor;
@@ -160,7 +162,8 @@ public class CDROM {
         sectorOffset = 0;
         parameterFifo = new Fifo("Parameter FIFO", 16);
         responseFifo = new Fifo("Response FIFO", 16);
-        commandFifo = new Fifo("Command FIFO", 32);        
+        commandFifo = new Fifo("Command FIFO", 32);
+        dataReady = false;
     }
 
     private static int BCD(int value) {
@@ -185,7 +188,7 @@ public class CDROM {
             case 2: parameterFifo.enqueue(value); return;
             case 3: HCHPCTL = value; return;
             case 1: {
-                System.out.printf("CMD %02x\n", value);
+                System.out.printf("CMD %02x %d\n", value, requestType);
                 switch (value) {
                 case 0x1:
                     requestType = REQUEST_INT3;
@@ -215,7 +218,7 @@ public class CDROM {
                     int mode = parameterFifo.fetch().data;
                     this.mode = mode;
                     requestType = REQUEST_INT3;
-                    setDelay(1000);
+                    setDelay(5000);
                     break;
                 }
                 case 0x6: // ReadN
@@ -223,8 +226,9 @@ public class CDROM {
                     setDelay(50000);
                     break;
                 case 0x9: // Pause
-                    requestType = REQUEST_INT3_INT2_PAUSE;
-                    setDelay(30000);
+                    paused = 1;
+                    // requestType = REQUEST_INT3_INT2_PAUSE;
+                    // setDelay(30000);
                     break;
                 case 0x13: // GetTN
                     requestType = REQUEST_INT3_GETTN;
@@ -338,21 +342,11 @@ public class CDROM {
         }
         return _data;
     }
-    static int counter = 0;
-
-    private static final int skipSyncBytes = 12;
-    private int dataOffset = 0;
-    private int maxDataRead = 0x800;
 
     public int readDataWord() {
         byte[] data = new byte[4];
         int sectorSizeMax = (mode & (1 << 5)) != 0 ? 0x924 : 0x800;
 
-        if (sectorOffset == sectorSizeMax) {
-            dataOffset = 0;
-            sectorOffset = 0;
-            sectorLba++;
-        }
         
         if (sectorSizeMax == 0x924) {
             emulator.disk.readData(data, sectorLba * 0x930 + sectorOffset + 0xC, 4);
@@ -361,6 +355,11 @@ public class CDROM {
         }
 
         sectorOffset += 4;
+        if (sectorOffset == sectorSizeMax) {
+            sectorOffset = 0;
+            sectorLba++;
+            dataReady = true;
+        }
         return littleEndian(data);
     }
 
@@ -369,8 +368,6 @@ public class CDROM {
     }
 
     public void step(int cycles) {
-        long cyclesElapsed = emulator.mips.getCyclesElapsed();
-
         if (delay > 0) {
             delay -= cycles;
             if (delay > 0)
@@ -420,6 +417,7 @@ public class CDROM {
         case REQUEST_INT1_REQUEST:
             responseFifo.enqueue(readStatusCode());
             doIrq(Int_DataReady);
+            dataReady = true;
             requestType = REQUEST_INT1;
             if ((mode & (1 << 7)) != 0) {
                 setDelay(ReadDoubleSpeed);
@@ -429,7 +427,7 @@ public class CDROM {
             break;
         case REQUEST_INT1:
             requestType = REQUEST_INT1;
-            if ((HCHPCTL & 0x80) != 0) {
+            if ((HCHPCTL & 0x80) != 0 && dataReady) {
                 responseFifo.enqueue(readStatusCode());
                 doIrq(Int_DataReady);
                 HSTS |= 1 << 6;
@@ -440,6 +438,14 @@ public class CDROM {
                 }
 
                 HCHPCTL &= ~0x80;
+                dataReady = false;
+            } else if (paused >= 1) {
+                doIrq(Int_DataReady);
+                setDelay(PauseSingleSpeed);
+                if (++paused < 500) {
+                    requestType = REQUEST_INT3_INT2_PAUSE;
+                    paused = 0;
+                }
             }
             break;
         case REQUEST_INT2_PAUSE:
@@ -454,7 +460,11 @@ public class CDROM {
             responseFifo.enqueue(0x22);
             requestType = REQUEST_INT2_PAUSE;
             doIrq(Int_Acknowledge);
-            setDelay(PauseSingleSpeed);
+            if ((mode & (1 << 7)) != 0) {
+                setDelay(PauseDoubleSpeed);
+            } else {
+                setDelay(PauseSingleSpeed);
+            }
             break;
         case REQUEST_INT3_YYMMDDVER:
             responseFifo.enqueue(0x95);

@@ -32,7 +32,7 @@ public class Peripheral {
         
         if ((SIO0_CTRL & (1 << 10)) != 0) {
             SIO0_STAT |= 1 << 9;
-            emulator.interruptController.service(InterruptController.IRQ_SIO);
+            // emulator.interruptController.service(InterruptController.IRQ_SIO);
         }
     }
 
@@ -45,7 +45,7 @@ public class Peripheral {
     }
     
     public int readSioStat(int index) {
-        return SIO0_STAT;
+        return 0xFFFFFFFF;
     }
 
     public void writeSioMode(int index, int data) {
