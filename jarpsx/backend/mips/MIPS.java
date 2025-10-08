@@ -70,7 +70,8 @@ public class MIPS {
     public boolean previousWriteToSR = false;
     public boolean linkSet;
     public int linkIndex;
-
+    public boolean requiredToCancel = false;
+    public int cancelRegisterIndex = 0;
     public class LoadDelayRegister {
         public int value;
         public int index;
@@ -159,6 +160,14 @@ public class MIPS {
                     return;
                 }
             }
+            
+            if (requiredToCancel && loadDelayReg[0].index == cancelRegisterIndex) {
+                loadDelayReg[0] = loadDelayReg[1];
+                loadDelayReg[1] = null;
+                --loadDelayCounter;
+                return;
+            }
+            
             if (!(loadDelayCounter == 2 && loadDelayReg[0].index == loadDelayReg[1].index)) { // Does not have a cancelled load delay
                 gpr[loadDelayReg[0].index] = loadDelayReg[0].value;
             }
@@ -168,12 +177,19 @@ public class MIPS {
             --loadDelayCounter;
         }
     }
+    
+    public void writeGPR(int index, int data) {
+        gpr[index] = data;
+        requiredToCancel = true;
+        cancelRegisterIndex = index;
+    }
 
     public void writeGPRDelayed(int index, int data) {
         loadDelayReg[loadDelayCounter] = new LoadDelayRegister();
         loadDelayReg[loadDelayCounter].index = index;
         loadDelayReg[loadDelayCounter].value = data;    
         loadDelayCounter++;
+        requiredToCancel = false;
         // gpr[index] = data;
     }
 
@@ -250,6 +266,8 @@ public class MIPS {
         cop0reg[7].value = data;
     }
 
+    static public boolean once = true;
+
     private Instruction fetchInstruction() {
         int data = 0;
         if ((PC & 3) != 0) {
@@ -294,11 +312,14 @@ public class MIPS {
                 break;
             }
             break;
+        case 0x80017f08:
+            gpr[V0] = gpr[A1];
+            break;
         case 0x80030000:
             try {
                 if (once == false) {
                     // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\jakub\\gte\\test-all\\test-all.exe");
-                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\hello_cd.exe");
+                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\redux_cpu.exe");
                     once = true;
 
                     String[] args = { "auto\0", "console\0", "release\0" };
@@ -343,38 +364,15 @@ public class MIPS {
             triggerException(Exception_InstructionBusError);
             data = readInt(PC);
         }
-
-        final long _testCycles = 234374317;
-        if (getCyclesElapsed() >= _testCycles - 1000 && getCyclesElapsed() <= _testCycles + 2000) {
-            // System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
+    
+        switch (PC) {
+        case 0xBFC0D8E0:
+            PC = gpr[RA];
+            data = readInt(PC);
+            System.out.printf("shouldn't reach here %X\n", gpr[RA]);
+            System.exit(1);
         }
 
-        if (getCyclesElapsed() >= 352376644 + 200_000_000) {
-            switch (PC) {
-            case 0x80013780:
-                // gpr[V0] = 0;
-                // System.out.printf("%d < %d\n", gpr[S0], gpr[V0]);
-                break;
-            }
-
-        } /*else if (getCyclesElapsed() >= 561866739 + 50_000_000 && getCyclesElapsed() <= 561866739 + 250_020_000) {
-            switch (PC) {
-            case 0x8003E6BC:
-                gpr[V0] = 0;
-                break;
-            case 0x80032918:
-                gpr[V0] = 0;
-                break;
-            case 0x80040A3C:
-            case 0x800135F8:
-                gpr[V0] = 0;
-                break;
-            }
-
-            // System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
-        } else if (getCyclesElapsed() >= 561866739 + 205_000_000) {
-            System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
-        }*/
         currentInstruction.setData(data);
         return currentInstruction;
     }
@@ -391,6 +389,7 @@ public class MIPS {
 
         if (exceptionCode == Exception_Interrupt) {
             exceptionBranchDelay = true;
+
             if (branchDelaySet) {
                 epc = PC - 4;
             } else {
@@ -440,7 +439,6 @@ public class MIPS {
         return interruptOccured;
     }
 
-    static public boolean once = true;
     static String test;
 
     public void step() {

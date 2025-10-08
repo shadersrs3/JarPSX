@@ -19,7 +19,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         imm5 = instruction.imm5();
-        mips.gpr[rd] = mips.gpr[rt] << imm5;
+        mips.writeGPR(rd, mips.gpr[rt] << imm5);
         mips.PC += 4;
     }
 
@@ -29,7 +29,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         imm5 = instruction.imm5();
-        mips.gpr[rd] = mips.gpr[rt] >>> imm5;
+        mips.writeGPR(rd, mips.gpr[rt] >>> imm5);
         mips.PC += 4;
     }
 
@@ -39,7 +39,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         imm5 = instruction.imm5();
-        mips.gpr[rd] = mips.gpr[rt] >> imm5;
+        mips.writeGPR(rd, mips.gpr[rt] >> imm5);
         mips.PC += 4;
     }
 
@@ -51,7 +51,7 @@ public class Interpreter {
         rt = instruction.rt();
         rs = instruction.rs();
         shift = mips.gpr[rs] & 0x1F;
-        mips.gpr[rd] = mips.gpr[rt] << shift;
+        mips.writeGPR(rd, mips.gpr[rt] << shift);
         mips.PC += 4;
     }
 
@@ -63,7 +63,7 @@ public class Interpreter {
         rt = instruction.rt();
         rs = instruction.rs();
         shift = mips.gpr[rs] & 0x1F;
-        mips.gpr[rd] = mips.gpr[rt] >>> shift;
+        mips.writeGPR(rd, mips.gpr[rt] >>> shift);
         mips.PC += 4;
     }
 
@@ -75,7 +75,7 @@ public class Interpreter {
         rt = instruction.rt();
         rs = instruction.rs();
         shift = mips.gpr[rs] & 0x1F;
-        mips.gpr[rd] = mips.gpr[rt] >> shift;
+        mips.writeGPR(rd, mips.gpr[rt] >> shift);
         mips.PC += 4;
     }
 
@@ -119,7 +119,7 @@ public class Interpreter {
     }
 
     public static void interpretMFHI(MIPS mips, Instruction instruction) {
-        mips.gpr[instruction.rd()] = mips.hi;
+        mips.writeGPR(instruction.rd(), mips.hi);
         mips.PC += 4;
     }
 
@@ -129,7 +129,7 @@ public class Interpreter {
     }
 
     public static void interpretMFLO(MIPS mips, Instruction instruction) {
-        mips.gpr[instruction.rd()] = mips.lo;
+        mips.writeGPR(instruction.rd(), mips.lo);
         mips.PC += 4;
     }
 
@@ -197,7 +197,7 @@ public class Interpreter {
             return;
         }
 
-        mips.gpr[rd] = result;
+        mips.writeGPR(rd, result);
         mips.PC += 4;
     }
 
@@ -206,7 +206,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         rs = instruction.rs();
-        mips.gpr[rd] = mips.gpr[rs] + mips.gpr[rt];
+        mips.writeGPR(rd, mips.gpr[rs] + mips.gpr[rt]);
         mips.PC += 4;
     }
 
@@ -221,7 +221,7 @@ public class Interpreter {
             return;
         }
 
-        mips.gpr[rd] = result;
+        mips.writeGPR(rd, result);
         mips.PC += 4;
     }
 
@@ -230,7 +230,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         rs = instruction.rs();
-        mips.gpr[rd] = mips.gpr[rs] - mips.gpr[rt];
+        mips.writeGPR(rd, mips.gpr[rs] - mips.gpr[rt]);
         mips.PC += 4;
     }
 
@@ -239,7 +239,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         rs = instruction.rs();
-        mips.gpr[rd] = mips.gpr[rs] | mips.gpr[rt];
+        mips.writeGPR(rd, mips.gpr[rs] | mips.gpr[rt]);
         mips.PC += 4;
     }
 
@@ -248,7 +248,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         rs = instruction.rs();
-        mips.gpr[rd] = mips.gpr[rs] & mips.gpr[rt];
+        mips.writeGPR(rd, mips.gpr[rs] & mips.gpr[rt]);
         mips.PC += 4;
     }
 
@@ -257,7 +257,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         rs = instruction.rs();
-        mips.gpr[rd] = mips.gpr[rs] ^ mips.gpr[rt];
+        mips.writeGPR(rd, mips.gpr[rs] ^ mips.gpr[rt]);
         mips.PC += 4;
     }
 
@@ -266,7 +266,7 @@ public class Interpreter {
         rd = instruction.rd();
         rt = instruction.rt();
         rs = instruction.rs();
-        mips.gpr[rd] = ~(mips.gpr[rs] | mips.gpr[rt]);
+        mips.writeGPR(rd, ~(mips.gpr[rs] | mips.gpr[rt]));
         mips.PC += 4;
     }
 
@@ -277,7 +277,8 @@ public class Interpreter {
         rt = instruction.rt();
         rs = instruction.rs();
         set = mips.gpr[rs] < mips.gpr[rt];
-        mips.gpr[rd] = set ? 1 : 0;
+
+        mips.writeGPR(rd, set ? 1 : 0);
         mips.PC += 4;
     }
 
@@ -288,9 +289,9 @@ public class Interpreter {
         rs = instruction.rs();
         mips.gpr[rd] = Integer.compareUnsigned(mips.gpr[rs], mips.gpr[rt]);
         if (mips.gpr[rd] < 0)
-            mips.gpr[rd] = 1;
+            mips.writeGPR(rd, 1);
         else
-            mips.gpr[rd] = 0;
+            mips.writeGPR(rd, 0);
         mips.PC += 4;
     }
 
@@ -471,7 +472,7 @@ public class Interpreter {
             return;
         }
 
-        mips.gpr[rt] = result;
+        mips.writeGPR(rt, result);
         mips.PC += 4;
     }
 
@@ -479,7 +480,7 @@ public class Interpreter {
         int imm = instruction.signedImmediate();
         int rt = instruction.rt();
         int rs = instruction.rs();
-        mips.gpr[rt] = mips.gpr[rs] + imm;
+        mips.writeGPR(rt, mips.gpr[rs] + imm);
         mips.PC += 4;
     }
 
@@ -488,7 +489,7 @@ public class Interpreter {
         int rt = instruction.rt();
         int rs = instruction.rs();
         boolean set = mips.gpr[rs] < imm;
-        mips.gpr[rt] = set ? 1 : 0;
+        mips.writeGPR(rt, set ? 1 : 0);
         mips.PC += 4;
     }
     
@@ -510,7 +511,7 @@ public class Interpreter {
         int rt = instruction.rt();
         int rs = instruction.rs();
         int imm = instruction.unsignedImmediate();
-        mips.gpr[rt] = mips.gpr[rs] & imm;
+        mips.writeGPR(rt, mips.gpr[rs] & imm);
         mips.PC += 4;
     }
     
@@ -518,7 +519,7 @@ public class Interpreter {
         int rt = instruction.rt();
         int rs = instruction.rs();
         int imm = instruction.unsignedImmediate();
-        mips.gpr[rt] = mips.gpr[rs] | imm;
+        mips.writeGPR(rt, mips.gpr[rs] | imm);
         mips.PC += 4;
     }
 
@@ -526,14 +527,14 @@ public class Interpreter {
         int rt = instruction.rt();
         int rs = instruction.rs();
         int imm = instruction.unsignedImmediate();
-        mips.gpr[rt] = mips.gpr[rs] ^ imm;
+        mips.writeGPR(rt, mips.gpr[rs] ^ imm);
         mips.PC += 4;
     }
     
     public static void interpretLUI(MIPS mips, Instruction instruction) {
         int rt = instruction.rt();
         int shift = instruction.unsignedImmediate() << 16;
-        mips.gpr[rt] = shift;
+        mips.writeGPR(rt, shift);
         mips.PC += 4;
     }
 
@@ -548,7 +549,7 @@ public class Interpreter {
         rt = instruction.rt();
         rs = instruction.rs();
         imm = instruction.signedImmediate();
-        address  = mips.gpr[rs] + imm;
+        address = mips.gpr[rs] + imm;
         mips.writeGPRDelayed(rt, mips.readByte(address));
         mips.PC += 4;
     }

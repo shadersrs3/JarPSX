@@ -23,7 +23,7 @@ public class MainApp {
             exception.printStackTrace();
         }
 
-        // GUI gui = new GUI(emu);
+        GUI gui = new GUI(emu);
 
         while (true) {
             long start = System.nanoTime();

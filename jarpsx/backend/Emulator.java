@@ -168,7 +168,7 @@ public class Emulator {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
                 timer.step();
-                cdrom.step(4);
+                cdrom.step(1);
                 if ((mips.getCyclesElapsed() % 345000) == 0) {
                     interruptController.service(InterruptController.IRQ_VBLANK);
                 }

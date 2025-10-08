@@ -217,6 +217,10 @@ public class Memory {
 
             throw new RuntimeException(String.format("Unimplemented readByte I/O offset 0x%04X", offset));
         }
+        
+        static int _0x1DA6;
+        static int _0x1DA8;
+        static int _0x1DAA;
 
         public short readShort(int offset) {
             if (offset >= 0 && offset < 0x400) {
@@ -225,7 +229,15 @@ public class Memory {
                 return (short) result;
             }
 
-            if (offset >= 0x1C00 && offset <= 0x1FFF) {                
+            if (offset >= 0x1C00 && offset <= 0x1FFF) {
+                switch (offset) {
+                case 0x1DA6:
+                    return (short)_0x1DA6;
+                case 0x1DA8:
+                    return (short)_0x1DA8;
+                case 0x1DAA:
+                    return (short)_0x1DAA;
+                }
                 return 0;
             }
 
@@ -375,6 +387,18 @@ public class Memory {
             }
 
             if (offset >= 0x1C00 && offset <= 0x1FFF) {
+                switch (offset) {
+                case 0x1DA6:
+                    _0x1DA6 = value;
+                    break;
+                case 0x1DA8:
+                    _0x1DA8 = value;
+                    break;
+                case 0x1DAA:
+                    _0x1DAA = value;
+                    break;
+                }
+
                 // System.out.printf("Unimplemented SPU writeShort 0x1F80%04X=%04X\n", offset, value);
                 return;
             }

@@ -73,14 +73,14 @@ public class Timer {
             }
 
             _value += 1;
-            currentValue = (_value / 8) & 0xFFFF;
+            currentValue = (_value) & 0xFFFF;
             if (value == 0xFFFF) {
                 if (irqFFFF) {
                     triggerInterrupt();
                 }
 
                 mode |= 1 << 12;
-                currentValue = 0;
+                _value = 0;
             }
 
             if (value == targetValue) {

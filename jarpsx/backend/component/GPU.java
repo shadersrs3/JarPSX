@@ -476,9 +476,7 @@ public class GPU {
         int verticalResolution = (displayMode >>> 2) & 1;
         int videoMode = (displayMode >>> 3) & 1;
         int verticalInterlace = (displayMode >>> 5) & 1;
-        return (texpage & 0x3FF) | displayEnable << 23
-                | horizontalResolution2 << 16 | horizontalResolution1 << 17
-                | videoMode << 20 | verticalInterlace << 22 | dmaDirection << 29 | dma;
+        return (texpage & 0x3FF) | dmaDirection << 29 | dma;
     }
     
     public int readGpuRead() {
