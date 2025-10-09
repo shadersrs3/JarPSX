@@ -528,7 +528,7 @@ public class CDROM {
                 break;
             default:
                 System.out.printf("Unimplemented GetTd track %d\n", track);
-                System.exit(1);
+                //System.exit(1);
             }
             doIrq(Int_Acknowledge);
             requestType = 0;

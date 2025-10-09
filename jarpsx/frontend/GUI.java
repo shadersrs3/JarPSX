@@ -90,11 +90,11 @@ public class GUI {
             if (ctr < 100)
                 ttyLogTextArea.append(String.format("hello aaaaaaaaaaaaaaaaaaa %d\n", ++ctr)); 
             g.drawImage(emulator.gpu.getVram(), 0, 0, null);
-            g.drawString(String.format("Ran for %d secs", emulator.stats.microsecondsRan / 1000000), 5, currentLine);
+            // g.drawString(String.format("Ran for %d secs", emulator.stats.microsecondsRan / 1000000), 5, currentLine);
             currentLine += NEWLINE;
-            g.drawString(String.format("Emulator elapsed us: %.3fus", (float)emulator.stats.microsecondsRanPerFrame), 5, currentLine);
+            // g.drawString(String.format("Emulator elapsed us: %.3fus", (float)emulator.stats.microsecondsRanPerFrame), 5, currentLine);
             currentLine += NEWLINE;
-            g.drawString("Latest Raised exception: None", 5, currentLine);
+            // g.drawString("Latest Raised exception: None", 5, currentLine);
         }
     }
 
@@ -343,7 +343,7 @@ public class GUI {
         menu.add(new JLabel("Copyright (C) shaders 2025 - JarPSX emulator"));
         menuBar.add(menu);
 
-        frame.setJMenuBar(null);
+        frame.setJMenuBar(menuBar);
         frame.setPreferredSize(new Dimension(WINDOW_WIDTH, WINDOW_HEIGHT));
         GamePanel gamePanel = new GamePanel();
         frame.add(gamePanel);

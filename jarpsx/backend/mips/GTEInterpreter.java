@@ -781,9 +781,9 @@ public class GTEInterpreter {
         case 0x0C: { // OP
             long IR1, IR2, IR3, D1, D2, D3, MAC1, MAC2, MAC3;
 
-            IR1 = mips.gteReg[9];
-            IR2 = mips.gteReg[10];
-            IR3 = mips.gteReg[11];
+            IR1 = (short)mips.gteReg[9];
+            IR2 = (short)mips.gteReg[10];
+            IR3 = (short)mips.gteReg[11];
 
             D1 = (short)(mips.gteReg[32]);
             D2 = (short)(mips.gteReg[34]);

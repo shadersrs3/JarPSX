@@ -230,9 +230,6 @@ public class MIPS {
     }
 
     public void writeInt(int address, int value) {
-        if (address == 0x8005cfa8) {
-            System.out.printf("Write to %08X with %08X PC %08X %d\n", address, value, PC, getCyclesElapsed());
-        }
         emulator.memory.writeInt(address, value);
     }
 
@@ -278,16 +275,6 @@ public class MIPS {
         }
 
         switch (PC) {
-        case 0x8004F304:
-            //gpr[V0] = gpr[V1];
-            break;
-        case 0x8002E178:
-            //gpr[V0] = 0;
-            break;
-        case 0xbfc04dec:
-            // System.out.printf("%X %d\n", gpr[RA], getCyclesElapsed());
-            // System.exit(1);
-            break;
         case 0xB0:
             switch (gpr[9]) {
             case 0x3f:
@@ -312,14 +299,11 @@ public class MIPS {
                 break;
             }
             break;
-        case 0x80017f08:
-            gpr[V0] = gpr[A1];
-            break;
         case 0x80030000:
             try {
                 if (once == false) {
                     // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\jakub\\gte\\test-all\\test-all.exe");
-                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\redux_cpu.exe");
+                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\gpu\\gp0-e1\\gp0-e1.exe");
                     once = true;
 
                     String[] args = { "auto\0", "console\0", "release\0" };
@@ -344,18 +328,6 @@ public class MIPS {
                 System.out.println("Exception occured: " + e.getMessage());
             }
             break;
-        case 0x8004F1A0:
-            //System.out.printf("%X: V1 %X\n", PC, gpr[V1]);
-            break;
-        case 0x8004F1A8:
-            //System.out.printf("%X: V0 %X V1 address %08X\n", PC, gpr[V0], gpr[V1] - 0x1a4c);
-            break;
-        case 0x8004F1B0:
-            //System.out.printf("%X: V0 %X - V1 %08X\n", PC, gpr[V0], gpr[V1]);
-            break;
-        case 0x8004F1D4:
-            // System.exit(1);
-            break;
         }
 
         try {
@@ -363,14 +335,6 @@ public class MIPS {
         } catch (Exception e) {
             triggerException(Exception_InstructionBusError);
             data = readInt(PC);
-        }
-    
-        switch (PC) {
-        case 0xBFC0D8E0:
-            PC = gpr[RA];
-            data = readInt(PC);
-            System.out.printf("shouldn't reach here %X\n", gpr[RA]);
-            System.exit(1);
         }
 
         currentInstruction.setData(data);

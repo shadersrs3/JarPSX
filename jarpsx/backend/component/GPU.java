@@ -164,7 +164,6 @@ public class GPU {
         int textureAddressX;
         int word;
         int paletteIndex;
-
         switch (pageColor) {
         case 0:
             textureAddressX = texPageX + (u >> 2);
@@ -197,7 +196,7 @@ public class GPU {
 
     private int signExtend(int data) {
         if ((data & (1 << 10)) != 0) {
-            data = -1024;
+            data = data | 0xFFFFFC00;
         } else {
             data &= 0x3FF;
         }
@@ -476,7 +475,11 @@ public class GPU {
         int verticalResolution = (displayMode >>> 2) & 1;
         int videoMode = (displayMode >>> 3) & 1;
         int verticalInterlace = (displayMode >>> 5) & 1;
-        return (texpage & 0x3FF) | dmaDirection << 29 | dma;
+
+        // System.out.printf("%X\n", texpage);
+        int gpustat = (texpage & 0x7FF) | ((texpage >>> 11) & 1) << 15 | dmaDirection << 29 | dma;
+        
+        return gpustat;
     }
     
     public int readGpuRead() {
@@ -752,7 +755,7 @@ public class GPU {
         case 0x01:
             break;
         case 0xE1: // Texpage gpustat relies on this
-            texpage = data;
+            texpage = (data & ~(1 << 11)) | (texpage & (1 << 11));
             break;
         case 0xE2: // texture window
             textureWindowSetting = data;
@@ -807,6 +810,9 @@ public class GPU {
             break;
         case 0x08:
             displayMode = data;
+            break;
+        case 0x09:
+            texpage = (texpage & ~(1 << 11)) | (data & 1) << 11;
             break;
         case 0x10:
             GPUREAD = 0;
