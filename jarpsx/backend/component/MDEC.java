@@ -58,7 +58,6 @@ public class MDEC {
         pixelBlocks = new int[16 * 16 * 1024];
         // random ass values
         currentBlock = 0;
-        pixelBlockX = pixelBlockY = 0;
         mdecCodeBlock = new int[65536*2];
         currentMdecCodeOffset = 0;
         src = 0;
@@ -97,41 +96,32 @@ public class MDEC {
     }
 
     public int readMacroblockData() {
-        // int index = pixelBlockArea & (pixelBlockSize - 1);
-        // pixelBlockArea += 2;
-        if (++pixelBlockX >= 16) {
-            ++pixelBlockY;
-            pixelBlockX = 0;
-        }
-        if (pixelBlockY >= 16) {
-            pixelBlockArea += 16 * 16;
-            pixelBlockY = 0;
-        }
-
-        int index = pixelBlockX + pixelBlockY * 16 + pixelBlockArea;
-        return toRgb(pixelBlocks[index*2]) | toRgb(pixelBlocks[index * 2 + 1]) << 16;
+        int index = pixelBlockArea;
+        pixelBlockArea += 2;
+        return toRgb(pixelBlocks[index]) | toRgb(pixelBlocks[index + 1]) << 16;
     }
 
-    private static void swap(int[] a, int[] b) {
-        int[] temp = a;
-        a = b;
-        b = temp;
-    }
+    private void realIdctCore(int[] src) {
+        int[] dst = new int[src.length];
 
-    private void realIdctCore(int[] block) {
-        int[] src = block;
-        int[] dst = new int[block.length];
-        for (int pass = 0; pass <= 1; pass++) {
-            for (int x = 0; x <= 7; x++) {
-                for (int y = 0; y <= 7; y++) {
-                    int sum = 0;
-                    for (int z = 0; z <= 7; z++)
-                        sum += src[y + z * 8] * (idctMatrix[x + z * 8] / 8);
-
-                    dst[x + y * 8] = (sum + 0xFFF)/ 0x2000;
+        for (int x = 0; x < 8; x++) {
+            for (int y = 0; y < 8; y++) {
+                int sum = 0;
+                for (int z = 0; z < 8; z++) {
+                    sum = sum + src[y+z*8]*(idctMatrix[x+z*8]/8);
                 }
+                dst[x + y * 8] = (sum + 0xfff) / 0x2000;
             }
-            swap(src, dst);
+        }
+
+        for (int x = 0; x < 8; x++) {
+            for (int y = 0; y < 8; y++) {
+                int sum = 0;
+                for (int z = 0; z < 8; z++) {
+                    sum = sum + dst[y+z*8]*(idctMatrix[x+z*8]/8);
+                }
+                src[x + y * 8] = (sum + 0xfff) / 0x2000;
+            }
         }
     }
 
@@ -149,12 +139,13 @@ public class MDEC {
 
         int qfact = data >>> 10;
         int coeff = signExtend(data & 0x3FF);
-        int value = coeff * quantTable[chroma ? 64 : 0];
+        int value = coeff * ((int)quantTable[chroma ? 64 : 0] & 0xFF);
         while (n < 64) {
             if (qfact == 0)
                 value = signExtend(data & 0x3FF) * 2;
 
             value = saturate(value);
+
             if (qfact > 0)
                 block[zigzag[zigzag[n]]] = value;
             if (qfact == 0)
@@ -176,10 +167,10 @@ public class MDEC {
     }
     
     private static int saturateRGB(int value) {
-        if (value < -128)
-            value = -128;
-        if (value > 127)
-            value = 127;
+        if (value < 0)
+            value = 0;
+        if (value > 0xFF)
+            value = 0xFF;
         return value;
     }
 
@@ -211,19 +202,22 @@ public class MDEC {
                 yBlock = y4Block;
                 break;
             }
+
             for (int x = 0; x < 8; x++) {
                 for (int y = 0; y < 8; y++) {
-                    int R = crBlock[((x + xx) / 2) + ((y + yy) / 2)*8];
-                    int B = cbBlock[((x + xx) / 2) + ((y + yy) / 2) * 8];
-                    int G = (int)((-0.3437*B)+(-0.7143*R));
-                    R=(int)(1.402*R);
-                    B=(int)(1.772*B);
-                    int Y = yBlock[x+y*8];
-                    R = saturateRGB(Y+R) & 0xFF;
-                    G = saturateRGB(Y+G) & 0xFF;
-                    B = saturateRGB(Y+B) & 0xFF;
+                    int Cr = crBlock[((x + xx) / 2) + ((y + yy) / 2) * 8];
+                    int Cb = cbBlock[((x + xx) / 2) + ((y + yy) / 2) * 8];
+                    int Y = yBlock[x + y * 8];
+                    // avocado reference (will reuse the one from psx-spx later)
+                    int R = (int)(Y + (1.402 * (Cr)));
+                    int G = (int)(Y - (0.334136 * (Cb)) - (0.714136 * (Cr)));
+                    int B = (int)(Y + (1.772 * (Cb)));
+
+                    R = saturateRGB(R + 128);
+                    G = saturateRGB(G + 128);
+                    B = saturateRGB(B + 128);
                     int BGR = R << 0 | G << 8 | B << 16;
-                    pixelBlock[(x+xx)+(y+yy)*16]=BGR;
+                    pixelBlock[(x + xx) + (y + yy) * 16] = BGR;
                 }
             }
         }
@@ -271,6 +265,7 @@ public class MDEC {
                 mdecCodeBlock[currentMdecCodeOffset] = data & 0xFFFF;
                 mdecCodeBlock[currentMdecCodeOffset + 1] = data >>> 16;
 
+                // TODO: implement this properly later
                 if ((mdecCodeBlock[currentMdecCodeOffset + 1] == 0xFE00) || (mdecCodeBlock[currentMdecCodeOffset] == 0xFE00)) {
                     currentBlock = (currentBlock + 1) % 6;
                     mdecStatusRegister = (mdecStatusRegister & ~0x70000) | currentBlock << 16;
@@ -327,10 +322,8 @@ public class MDEC {
                         convertToRgb();
                         for (int x = 0; x < 16 * 16; x++) {
                             pixelBlocks[x + pixelBlockArea] = pixelBlock[x];
-                            //System.out.printf("%X\n", pixelBlock[x]);
                         }
-                        
-                        //System.exit(1);
+
                         pixelBlockArea += 256;
                         break;
                     }
