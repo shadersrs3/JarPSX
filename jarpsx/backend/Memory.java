@@ -269,7 +269,6 @@ public class Memory {
             throw new RuntimeException(String.format("Unimplemented readShort I/O offset 0x%04X", offset));
         }
 
-        static int ctr;
         public int readInt(int offset) {
             if (offset >= 0 && offset < 0x400) {
                 int result = ((int)readShort(offset) & 0xFFFF) | (int)readShort(offset + 2) << 16;
@@ -301,6 +300,7 @@ public class Memory {
             }
             
             switch (offset) {
+            case MDEC_STATUS_OFFSET: return emulator.mdec.readStatusRegister();
             case EXPANSION_2_DELAY_OFFSET:
                 return 0;
             case EXPANSION_1_BASE_ADDRESS_OFFSET:
@@ -467,6 +467,12 @@ public class Memory {
             }
 
             switch (offset) {
+            case MDEC_COMMAND_OFFSET:
+                emulator.mdec.writeDataWord(value);
+                return;
+            case MDEC_CONTROL_OFFSET:
+                emulator.mdec.writeMdecControl(value);
+                return;
             case EXPANSION_1_BASE_ADDRESS_OFFSET:
             case EXPANSION_2_BASE_ADDRESS_OFFSET:
             case EXPANSION_1_DELAY_OFFSET:

@@ -14,9 +14,10 @@ public class MainApp {
     public static void main(String[] args) {
         Emulator emu = new Emulator();
         try {
-            emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\RidgeRacer\\ridgeracer.bin");
+            // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\RidgeRacer\\ridgeracer.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\mk2\\mk2.bin");
-            // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\crash\\crash.bin");
+            emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\crash\\crash.bin");
+            // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\badapple\\movie2.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\cd\\hello_cd.bin");
             emu.loadBIOS(Paths.get("").toAbsolutePath().toString() + "\\data\\SCPH5501.BIN");
             /*
@@ -111,7 +112,7 @@ public class MainApp {
             System.exit(1);
         }
 
-        // GUI gui = new GUI(emu);
+        GUI gui = new GUI(emu);
 
         while (true) {
             long start = System.nanoTime();

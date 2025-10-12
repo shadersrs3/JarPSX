@@ -263,7 +263,7 @@ public class MIPS {
         cop0reg[7].value = data;
     }
 
-    static public boolean once = true;
+    static public boolean once = false;
 
     private Instruction fetchInstruction() {
         int data = 0;
@@ -288,13 +288,7 @@ public class MIPS {
                     System.out.printf("%c", _data);
                 }
                 break;
-            case 0x3d:
-                if ((char)gpr[4] == '\n') {
-                    test = "";
-                } else {
-                    test += (char) gpr[4];
-                }
-                
+            case 0x3d:                
                 System.out.print((char)gpr[4]);
                 break;
             }
@@ -303,7 +297,8 @@ public class MIPS {
             try {
                 if (once == false) {
                     // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\jakub\\gte\\test-all\\test-all.exe");
-                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\gpu\\gp0-e1\\gp0-e1.exe");
+                    // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\gpu\\gp0-e1\\gp0-e1.exe");
+                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\movie-15bit.exe");
                     once = true;
 
                     String[] args = { "auto\0", "console\0", "release\0" };
@@ -338,6 +333,9 @@ public class MIPS {
         }
 
         currentInstruction.setData(data);
+        if (getCyclesElapsed() > 33_000_000) {
+            // System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
+        }
         return currentInstruction;
     }
 
@@ -402,8 +400,6 @@ public class MIPS {
 
         return interruptOccured;
     }
-
-    static String test;
 
     public void step() {
         boolean interruptOccured = checkForInterrupts();

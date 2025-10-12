@@ -44,6 +44,7 @@ public class Emulator {
         cdrom = new CDROM(this);
         gpu = new GPU(this);
         peripheral = new Peripheral(this);
+        mdec = new MDEC(this);
         stats = new Stats();
         disk = new Disk();
 
@@ -167,7 +168,7 @@ public class Emulator {
         try {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
-                timer.step();
+                // timer.step();
                 cdrom.step(4);
                 if ((mips.getCyclesElapsed() % 345000) == 0) {
                     interruptController.service(InterruptController.IRQ_VBLANK);

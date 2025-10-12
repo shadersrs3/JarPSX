@@ -421,7 +421,10 @@ public class GPU {
     }
 
     public int readVram16(int x, int y) {
-        return vramData[y * 1024 + x];
+        int index = y * 1024 + x;
+        if (index >= 1024 * 512) // FIXME
+            index = 0;
+        return vramData[index];
     }
 
     public void writeVram16(int x, int y, int value) {
@@ -563,11 +566,11 @@ public class GPU {
                 xsiz = ((xsiz - 1) & 0x3FF) + 1;
                 ysiz = ((ysiz - 1) & 0x1FF) + 1;
                 int sizeDecrement = xsiz * ysiz;
+
                 if ((sizeDecrement & 1) != 0)
-                    sizeDecrement = (sizeDecrement + 1) >>> 1;
-                else
-                    sizeDecrement >>>= 1;
-                
+                    sizeDecrement += 1;
+
+                sizeDecrement >>>= 1;
                 this.sizeDecrement = sizeDecrement;
                 targetXPosition = initialXPosition + xsiz;
                 targetYPosition = initialYPosition + ysiz;
@@ -586,9 +589,10 @@ public class GPU {
                         if (++currentYPosition >= targetYPosition) {
                         }
                     }
-                } else {
-                    renderType = 0;
                 }
+
+                if (sizeDecrement == 0)
+                    renderType = 0;
                 break;
             }
             return;
@@ -777,7 +781,7 @@ public class GPU {
             break;
         default:
             System.out.printf("Unimplemented GP0 command %02X %08X\n", command, data);
-            // System.exit(1);
+            System.exit(1);
         }
     }
     

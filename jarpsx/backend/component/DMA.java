@@ -153,6 +153,9 @@ public class DMA {
                 switch (transferDirection) {
                 case TO_MAIN_RAM:
                     switch (index) {
+                    case 1: // MDEC
+                        emulator.memory.writeInt(baseAddress, emulator.mdec.readMacroblockData());
+                        break;
                     case 2: // GPU
                         emulator.memory.writeInt(baseAddress, emulator.gpu.readGpuRead());
                         break;
@@ -163,6 +166,9 @@ public class DMA {
                     break;
                 case FROM_MAIN_RAM:
                     switch (index) {
+                    case 0: // MDEC
+                        emulator.mdec.writeDataWord(emulator.memory.readInt(baseAddress));
+                        break;
                     case 2: // GPU
                         emulator.gpu.writeGp0(emulator.memory.readInt(baseAddress));
                         break;

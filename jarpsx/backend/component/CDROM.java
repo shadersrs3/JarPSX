@@ -242,6 +242,14 @@ public class CDROM {
                     requestType = REQUEST_INT3_INT2_SEEKL;
                     setDelay(10000);
                     break;
+                case 0x03: // Play
+                    requestType = REQUEST_INT3;
+                    setDelay(10000);
+                    break;
+                case 0x16: // SeekP
+                    requestType = REQUEST_INT3_INT2_SEEKL;
+                    setDelay(10000);
+                    break;
                 case 0x19: // Test
                 {
                     int subcommand = parameterFifo.fetch().data;
