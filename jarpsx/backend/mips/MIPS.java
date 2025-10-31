@@ -144,9 +144,7 @@ public class MIPS {
         loadDelayCounter = 0;
         gpr = new int[32];
         for (int i = 0; i < 32; i++)
-            gpr[i] = 0;
-        
-        Interpreter.initializeTable();
+            gpr[i] = 0;        
     }
     
     public void handleLoadDelaySlot(boolean loadDelaySet) {
@@ -263,8 +261,8 @@ public class MIPS {
         cop0reg[7].value = data;
     }
 
-    static public boolean once = false;
-
+    static public boolean once = true;
+    private int x = 0;
     private Instruction fetchInstruction() {
         int data = 0;
         if ((PC & 3) != 0) {
@@ -273,7 +271,7 @@ public class MIPS {
             setBadVaddr(address);
             setEPC(address);
         }
-
+        
         switch (PC) {
         case 0xB0:
             switch (gpr[9]) {
@@ -298,7 +296,10 @@ public class MIPS {
                 if (once == false) {
                     // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\jakub\\gte\\test-all\\test-all.exe");
                     // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\gpu\\gp0-e1\\gp0-e1.exe");
-                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\movie-15bit.exe");
+                    // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\movie-15bit.exe");
+                    // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\hello_cd.exe");
+                    // emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\cdlreads.exe");
+                    emulator.sideloadPSXExecutable(Paths.get("").toAbsolutePath().toString() + "\\data\\executables\\frame-15bit-dma.exe");
                     once = true;
 
                     String[] args = { "auto\0", "console\0", "release\0" };
@@ -325,17 +326,17 @@ public class MIPS {
             break;
         }
 
-        try {
-            data = readInt(PC);
-        } catch (Exception e) {
-            triggerException(Exception_InstructionBusError);
-            data = readInt(PC);
+        data = readInt(PC);
+        
+        if (PC == 0x8001ae24) {
+            System.out.printf("dec vlc 0x%08X %08x\n", PC, gpr[A0]);
+            // System.exit(1);
+        }
+        if (PC == 0x8001a65c) {
+            System.out.printf("%08x\n", gpr[V0]);
         }
 
         currentInstruction.setData(data);
-        if (getCyclesElapsed() > 33_000_000) {
-            // System.out.printf("%08X %s\n", PC, Disassembler.disassemble(data, PC, true));
-        }
         return currentInstruction;
     }
 
@@ -351,11 +352,11 @@ public class MIPS {
 
         if (exceptionCode == Exception_Interrupt) {
             exceptionBranchDelay = true;
-
             if (branchDelaySet) {
                 epc = PC - 4;
             } else {
                 epc = PC;
+                // System.exit(1);
             }
 
             branchDelaySet = false;
@@ -367,7 +368,7 @@ public class MIPS {
                 bd = 0x80000000;
             } else {
                 epc = PC;
-            }
+            }            
         }
 
         if (bev1Set) {
@@ -409,6 +410,7 @@ public class MIPS {
 
         Instruction instruction = fetchInstruction();
         gpr[0] = 0;
+        
         Interpreter.execute(this, instruction);
 
         handleLoadDelaySlot(loadDelaySet);

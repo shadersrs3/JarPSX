@@ -346,6 +346,7 @@ public class GPU {
                 int r = red;
                 int g = green;
                 int b = blue;
+
                 if (info.textured) {
                     int color = lookupTexture(texpageX, texpageY, (info.uv & 0xFF) + i, ((info.uv >>> 8) & 0xFF) + j, colorDepth, info.uv >>> 16);
                     r = (color & 0x1F) << 3;
@@ -385,7 +386,7 @@ public class GPU {
             int red = data & 0x1F;
             int green = (data >>> 5) & 0x1F;
             int blue = (data >>> 10) & 0x1F;
-            argb |= (red) << 16 | (green) << 8 | (blue);
+            argb |= (data & 0xFF) << 16 | ((data >>> 8) & 0xFF) << 8 | ((data >>> 16) & 0xFF);
             vramBuffer[i] = 0xFF00_0000 | red << (16+3) | (green << (8+3)) | (blue << (0+3));
         }
     }
@@ -586,8 +587,7 @@ public class GPU {
                     currentXPosition += 2;
                     if (currentXPosition >= targetXPosition) {
                         currentXPosition = initialXPosition;
-                        if (++currentYPosition >= targetYPosition) {
-                        }
+                        ++currentYPosition;
                     }
                 }
 

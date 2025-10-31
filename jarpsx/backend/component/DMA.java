@@ -66,16 +66,30 @@ public class DMA {
     }
     
     public void setDICR(int value) {
-        int interruptFlags = ~(value & 0x7F000000);
-        value &= interruptFlags;
-        DICR = value;
+        int bits = value & 0xFFFFFF;
+        int reset = value & 0x7F000000;
+        DICR = (DICR & ~0xFFFFFF) | value;
+        DICR &= ~(value & 0x7F000000);
     }
     
+    public void checkForInterrupts() {
+        if (((emulator.dma.DICR & (1 << 23)) != 0 && ((emulator.dma.DICR & 0x7F0000) != 0 && (emulator.dma.DICR & 0x7F000000) != 0))) {
+            emulator.dma.DICR |= 1 << 31;
+            emulator.interruptController.service(InterruptController.IRQ_DMA);
+        } else {
+            emulator.dma.DICR &= ~(1 << 31);
+        }
+    }
     public int getDPCR() {
         return DPCR;
     }
     
     public int getDICR() {
+        if (((DICR & (1 << 23)) != 0 && ((DICR & 0x7F0000) != 0 && (DICR & 0x7F000000) != 0))) {
+            DICR |= 1 << 31;
+        } else {
+            DICR &= ~(1 << 31);
+        }
         return DICR;
     }
 
@@ -93,14 +107,16 @@ public class DMA {
             int transferDirection = channel.getChannelControl() & 1;
             int transferStep = ((channel.getChannelControl() >> 1) & 1) != 0 ? -4 : 4;
             int words = channel.getBlockControl();
-            if (words < 0 || words > 0xFFFF) {
-                words &= 0xFFFF;
-            }
 
+            words &= 0xFFFF;
             if (words == 0)
                 words = 0x10000;
 
-            int baseAddress = channel.getBaseAddress();
+            if (index == CDROM) {
+                System.out.printf("CDROM %x %x %x cycles %x %x %x\n", channel.getBaseAddress(), words, emulator.cdrom.getCurrentSectorLba(), emulator.mips.getCyclesElapsed(), emulator.mips.PC, emulator.mips.gpr[31]);
+            }
+
+            int baseAddress = channel.getBaseAddress() & ~3;
             for (int i = 0; i < words; i++) {
                 int data;
                 switch (transferDirection) {
@@ -137,10 +153,6 @@ public class DMA {
             int bs = channel.getBlockControl() & 0xFFFF;
             int ba = (channel.getBlockControl() >>> 16) & 0xFFFF;
 
-            if (bs < 0 || bs > 0xFFFF)
-                bs &= 0xFFFF;
-            if (ba < 0 || ba > 0xFFFF)
-                ba &= 0xFFFF;
             if (bs == 0)
                 bs = 0x10000;
             if (ba == 0)
@@ -158,6 +170,9 @@ public class DMA {
                         break;
                     case 2: // GPU
                         emulator.memory.writeInt(baseAddress, emulator.gpu.readGpuRead());
+                        break;
+                    case 4: // SPU (NEED TO IMPLEMENT)
+                        emulator.memory.writeInt(baseAddress, 0);
                         break;
                     default:
                         System.out.printf("Unimplemented Sync blocks (to Main Ram) DMA requests channel %d", index);
@@ -183,6 +198,7 @@ public class DMA {
                     System.out.printf("Unimplemented Sync blocks transfer direction %d channel %d", transferDirection, index);
                     System.exit(1);
                 }
+
                 baseAddress = (baseAddress + transferStep) & 0xFFFFFC;
             }
             break;
@@ -210,7 +226,15 @@ public class DMA {
             System.exit(1);
         }
 
+        int dmaInterruptFlag = 1 << index;
         DICR |= 1 << (24 + index);
+        if ((emulator.dma.DICR & (1 << 23)) != 0 && (((emulator.dma.DICR & 0x7F0000) >>> 16) & dmaInterruptFlag) != 0) {
+            emulator.dma.DICR |= 1 << 31;
+            emulator.interruptController.service(InterruptController.IRQ_DMA);
+        } else {
+            emulator.dma.DICR &= ~(1 << 31);
+        }
+
         channel.channelControl &= ~(1 << 24);
     }
 }

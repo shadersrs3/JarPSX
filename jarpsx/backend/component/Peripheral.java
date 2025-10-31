@@ -85,6 +85,6 @@ public class Peripheral {
     }
 
     public void writeSioBaudRate(int index, int value) {
-        System.out.printf("Write baudrate %04X\n", value);
+        // System.out.printf("Write baudrate %04X\n", value);
     }
 }

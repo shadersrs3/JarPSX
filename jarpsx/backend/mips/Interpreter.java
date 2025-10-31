@@ -843,8 +843,7 @@ public class Interpreter {
         }
         exec.execute(mips, instruction);
     }
-        
-    public static void initializeTable() {
+    static {
         for (int i = 0; i < 0x40; i++) {
             opcodeExecutor[i] = functorExecutor[i] = null;
         }

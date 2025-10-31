@@ -73,7 +73,15 @@ public class Timer {
             }
 
             _value += 1;
-            currentValue = (_value) & 0xFFFF;
+            switch (counterIndex) {
+            case 0:
+            case 1:
+                currentValue = (_value >>> 4) & 0xFFFF;
+                break;
+            case 2:
+                currentValue = (_value) & 0xFFFF;
+                break;
+            }
             if (value == 0xFFFF) {
                 if (irqFFFF) {
                     triggerInterrupt();
@@ -111,7 +119,8 @@ public class Timer {
     }
     
     public void step() {
-        for (int i = 0; i < 3; i++)
-            timerData[i].step();
+        timerData[0].step();
+        timerData[1].step();
+        timerData[2].step();
     }
 }

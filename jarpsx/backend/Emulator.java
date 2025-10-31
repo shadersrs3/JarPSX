@@ -168,8 +168,8 @@ public class Emulator {
         try {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
-                // timer.step();
-                cdrom.step(4);
+                timer.step();
+                cdrom.step(1);
                 if ((mips.getCyclesElapsed() % 345000) == 0) {
                     interruptController.service(InterruptController.IRQ_VBLANK);
                 }
@@ -182,8 +182,8 @@ public class Emulator {
             System.out.println("Stack trace and message: " + exception.getMessage());
             exception.printStackTrace();
             memory.dumpRam(Paths.get("").toAbsolutePath().toString() + "\\dump.ram");
-            System.out.printf("\nPC %08X", mips.gpr[31]);
-            System.exit(-1);
+            System.out.printf("\nPC %08X %x", mips.PC, mips.getCyclesElapsed());
+            System.exit(1);
         }
     }
 }

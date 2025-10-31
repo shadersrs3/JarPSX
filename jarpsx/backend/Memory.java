@@ -208,6 +208,8 @@ public class Memory {
             }
 
             switch (offset) {
+            case 0x10F6: // DICR
+                return (byte)((emulator.dma.DICR >>> 16) & 0xFF);
             case CDROM_HINT_OFFSET:
             case CDROM_RDDATA_OFFSET:
             case CDROM_RESULT_OFFSET:
@@ -321,7 +323,6 @@ public class Memory {
             case GPUREAD_OFFSET:
                 return emulator.gpu.readGpuRead();
             case GPUSTAT_OFFSET:
-
                 return emulator.gpu.readGpuStat();
             }
 
@@ -344,6 +345,9 @@ public class Memory {
 
             switch (offset) {
             case 0x2041: // POST
+                return;
+            case 0x10F6: // DICR
+                emulator.dma.setDICR(((int) value & 0xFF) << 16);
                 return;
             case CDROM_ADDRESS_OFFSET:
             case CDROM_COMMAND_OFFSET:
@@ -440,13 +444,6 @@ public class Memory {
                     if ((value & (1 << 28)) != 0 || (value & (1 << 24)) != 0)
                         emulator.dma.runChannel(channelIndex);
                     break;
-                }
-
-                if (((emulator.dma.DICR & (1 << 23)) != 0 && ((emulator.dma.DICR & 0x7F0000) != 0 && (emulator.dma.DICR & 0x7F000000) != 0))) {
-                    emulator.dma.DICR |= 1 << 31;
-                    emulator.interruptController.service(InterruptController.IRQ_DMA);
-                } else {
-                    emulator.dma.DICR &= ~(1 << 31);
                 }
                 return;
             }
@@ -677,7 +674,7 @@ public class Memory {
         return biosAccess.bios;
     }
     
-    public byte[] getRamData() {
+     public byte[] getRamData() {
         return ramDirectAccess.ram;
     }
     

@@ -26,6 +26,10 @@ class Fifo {
         currentSize = front = back = 0;
     }
 
+    public int getSize() {
+        return currentSize;
+    }
+
     public Data enqueue(int data) {
         if (currentSize > queueSize) {
             currentSize = queueSize;
@@ -76,6 +80,106 @@ class Fifo {
 }
 
 public class CDROM {        
+    public static class XaAdpcmDecoder {
+        private int fileNumber;
+        private int channelNumber;
+        private int stereo;
+        private int sampleRate;
+        private int bitsPerSample;
+        private byte[] xaAdpcmSector;
+        private static final int[] pos_xa_adpcm_table = { 0, +60, +115, +98, +122 };
+        private static final int[] neg_xa_adpcm_table = { 0,   0,  -52, -55,  -60 };
+        public XaAdpcmDecoder() {
+            this.xaAdpcmSector = null;
+        }
+        
+        public void setCurrentState(byte[] subheader, byte[] xaAdpcmSector) {
+            fileNumber = subheader[0];
+            channelNumber = subheader[1] & 0x1F;
+            stereo = subheader[3] & 3;
+            sampleRate = (subheader[3] >>> 2) & 3;
+            bitsPerSample = (subheader[3] >>> 4) & 3;
+            this.xaAdpcmSector = xaAdpcmSector;
+            if (xaAdpcmSector != null) {
+                for (int i = 0x900; i < 0x914; i++)
+                    xaAdpcmSector[i] = 0;
+            }
+
+            switch (sampleRate) {
+            case 0:
+                sampleRate = 37800;
+                break;
+            case 1:
+                sampleRate = 18900;
+                break;
+            }
+
+            switch (bitsPerSample) {
+            case 0:
+                bitsPerSample = 4;
+                break;
+            case 1:
+                bitsPerSample = 8;
+                break;
+            }
+        }
+
+        public int decodeNibble(int data, int shift, int filter, int[] old) {
+            int f0 = pos_xa_adpcm_table[filter];
+            int f1 = neg_xa_adpcm_table[filter];
+            data = (data << 28) >> 28;
+            data = (data << 12);
+            data >>= shift;
+            if (data < -0x8000)
+                data = -0x8000;
+            if (data > 0x7FFF)
+                data = 0x7FFF;
+
+            System.out.printf("%X %X\n", shift, data);
+            old[1] = old[0];
+            old[0] = data;
+            return 0;
+        }
+                
+        public void decodeData(int srcOffset, int block, int[] old) {
+            int dataBlock = srcOffset + 0x10;
+            for (int i = 0; i < 28; i++) {
+                for (int j = 0; j < 8; j++) {
+                    int header = (int)xaAdpcmSector[4 + j + srcOffset] & 0xFF;
+                    int shift = (header & 0xF);
+                    int filter = (header >>> 4) & 3;
+                    int data = (((int)xaAdpcmSector[dataBlock + j / 2] & 0xFF) >> ((j & 1) * 4)) & 0xF;
+                    decodeNibble(data, shift, filter, old);
+                }
+
+                System.exit(1);
+                dataBlock += 4;
+            }
+        }
+
+        public short[] decodeSector() {
+            byte[] a = new byte[4];
+
+            short[] uncompressedSector = new short[0xA80];
+            int[] old = new int[2];
+            if (bitsPerSample == 8) {
+                System.out.printf("bitsPerSample == 8\n");
+                System.exit(1);
+            }
+            
+            int srcOffset = 0;
+            for (int i = 0; i <= 18; i++) {
+                for (int block = 0; block < 8; block++) {
+                    decodeData(srcOffset, block, old);
+                }
+                System.exit(1);
+                srcOffset += 128;
+            }
+            
+            return uncompressedSector;
+        }
+    }
+
     public static final int Int_NoIntr = 0;
     public static final int Int_DataReady = 1;
     public static final int Int_Complete = 2;
@@ -97,8 +201,8 @@ public class CDROM {
 
     private static final int NopAverage = 0xC4E1;
     private static final int InitAverage = 0x13CCE;
-    private static final int ReadSingleSpeed = 0x6E3F5;
-    private static final int ReadDoubleSpeed = 0x6E3F5 / 2;
+    private static final int ReadSingleSpeed = 0x6E400;
+    private static final int ReadDoubleSpeed = 0x6E400 / 2;
     // Second response
     private static final int GetIDAverage = 0x4A00;
     private static final int PauseSingleSpeed = 0x021181c;
@@ -166,6 +270,10 @@ public class CDROM {
         dataReady = false;
     }
 
+    public int getCurrentSectorLba() {
+        return sectorLba;
+    }
+
     private static int BCD(int value) {
         return (value >>> 4) * 10 + (value & 0xF);
     }
@@ -174,6 +282,7 @@ public class CDROM {
         return ((min * 60 + sec) * 75 + frame) - 150;
     }
 
+    int cmd;
     public void write(int offset, int value) {
         if (offset == 0) {
             currentRegisterBank = value & 3;
@@ -188,6 +297,7 @@ public class CDROM {
             case 2: parameterFifo.enqueue(value); return;
             case 3: HCHPCTL = value; return;
             case 1: {
+                cmd = value;
                 System.out.printf("CMD %02x %d\n", value, requestType);
                 switch (value) {
                 case 0x1:
@@ -199,7 +309,7 @@ public class CDROM {
                     int ss = BCD(parameterFifo.fetch().data);
                     int sector = BCD(parameterFifo.fetch().data);
                     System.out.printf("SetLoc %d:%d:%d\n", mm, ss, sector);
-                    sectorLba = CdPosToInt(mm, ss, sector);
+                    sectorLbaCurrent = sectorLba = CdPosToInt(mm, ss, sector);
                     sectorOffset = 0;
                     requestType = REQUEST_INT3;
                     setDelay(1000);
@@ -221,14 +331,18 @@ public class CDROM {
                     setDelay(5000);
                     break;
                 }
+                case 0x1B: // ReadS
+                    requestType = REQUEST_INT3_INT1;
+                    setDelay(50000);
+                    break;
                 case 0x6: // ReadN
                     requestType = REQUEST_INT3_INT1;
                     setDelay(50000);
                     break;
                 case 0x9: // Pause
-                    paused = 1;
+                    requestType = REQUEST_INT3_INT2_PAUSE;
                     // requestType = REQUEST_INT3_INT2_PAUSE;
-                    // setDelay(30000);
+                    setDelay(30000);
                     break;
                 case 0x13: // GetTN
                     requestType = REQUEST_INT3_GETTN;
@@ -351,29 +465,48 @@ public class CDROM {
         return _data;
     }
 
+    byte[] subheader = new byte[4];
+    int sectorLbaCurrent;
     public int readDataWord() {
         byte[] data = new byte[4];
         int sectorSizeMax = (mode & (1 << 5)) != 0 ? 0x924 : 0x800;
+        int submode = (int)subheader[2] & 0xFF;
+        int isData = (submode >>> 3) & 1;
+        boolean isXaAdpcm = (mode & 0x40) != 0;
 
-        
+        if (sectorOffset == 0) {
+            if (sectorSizeMax == 0x924) {
+                emulator.disk.readData(subheader, sectorLba * 0x930 + 0xC + 4, 4);
+            } else {
+                subheader[2] = 0;
+            }
+        }
+
         if (sectorSizeMax == 0x924) {
-            emulator.disk.readData(data, sectorLba * 0x930 + sectorOffset + 0xC, 4);
+            emulator.disk.readData(data, sectorLba * 0x930 + sectorOffset + 0xC , 4);
         } else {
             emulator.disk.readData(data, sectorLba * 0x930 + sectorOffset + 0x18, 4);
         }
 
         sectorOffset += 4;
-        if (sectorOffset == sectorSizeMax) {
+        if (sectorOffset == sectorSizeMax || (isData == 1 && sectorOffset == 0x80C)) {
             sectorOffset = 0;
             sectorLba++;
+            if (isXaAdpcm && sectorLbaCurrent + 7 == sectorLba) {
+                sectorLbaCurrent = sectorLba + 1;
+                sectorLba++;
+            }
             dataReady = true;
         }
+
         return littleEndian(data);
     }
 
     public void setDelay(int delay) {
         this.delay = delay;
     }
+
+    int counter;
 
     public void step(int cycles) {
         if (delay > 0) {
@@ -415,7 +548,7 @@ public class CDROM {
         case REQUEST_INT3_INT1:
             responseFifo.enqueue(readStatusCode());
             doIrq(Int_Acknowledge);
-            requestType = REQUEST_INT1_REQUEST;
+            requestType = REQUEST_INT1;
             if ((mode & (1 << 7)) != 0) {
                 setDelay(ReadDoubleSpeed);
             } else {
@@ -423,37 +556,21 @@ public class CDROM {
             }
             break;
         case REQUEST_INT1_REQUEST:
+            requestType = REQUEST_INT1;
+            break;
+        case REQUEST_INT1:
+            requestType = REQUEST_INT1;
             responseFifo.enqueue(readStatusCode());
             doIrq(Int_DataReady);
-            dataReady = true;
-            requestType = REQUEST_INT1;
+            HSTS |= 1 << 6;
+            HCHPCTL &= ~0x80;
+            dataReady = false;
+            if (cmd == 0x1b) {
+            }
             if ((mode & (1 << 7)) != 0) {
                 setDelay(ReadDoubleSpeed);
             } else {
                 setDelay(ReadSingleSpeed);
-            }
-            break;
-        case REQUEST_INT1:
-            requestType = REQUEST_INT1;
-            if ((HCHPCTL & 0x80) != 0 && dataReady) {
-                responseFifo.enqueue(readStatusCode());
-                doIrq(Int_DataReady);
-                HSTS |= 1 << 6;
-                if ((mode & (1 << 7)) != 0) {
-                    setDelay(ReadDoubleSpeed);
-                } else {
-                    setDelay(ReadSingleSpeed);
-                }
-
-                HCHPCTL &= ~0x80;
-                dataReady = false;
-            } else if (paused >= 1) {
-                doIrq(Int_DataReady);
-                setDelay(PauseSingleSpeed);
-                if (++paused < 500) {
-                    requestType = REQUEST_INT3_INT2_PAUSE;
-                    paused = 0;
-                }
             }
             break;
         case REQUEST_INT2_PAUSE:

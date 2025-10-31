@@ -20,9 +20,8 @@ public class MDEC {
     private int[] mdecCodeBlock;
     private int[] pixelBlock;
     private int currentMdecCodeOffset;
-    private int pixelBlockX, pixelBlockY;
     private int pixelBlockArea;
-    private int pixelBlockSize;
+    private int pixelBlockAreaSize;
     private int[] pixelBlocks;
     private static final int[] zigzag = {
         0 ,1 ,5 ,6 ,14,15,27,28,
@@ -34,6 +33,15 @@ public class MDEC {
         21,34,37,47,50,56,59,61,
         35,36,48,49,57,58,62,63
     };
+
+    private static int[] zagzig;
+
+    static {
+        zagzig = new int[64];
+        for (int i = 0; i < 64; i++) {
+            zagzig[zigzag[i]] = i;
+        }
+    }
 
     private int[] crBlock = new int[64];
     private int[] cbBlock = new int[64];
@@ -52,7 +60,7 @@ public class MDEC {
         parameterCounter = 0;
         commandData = 0;
         idctMatrix = new short[64];
-        quantTable = new byte[128];
+        quantTable = new byte[256]; // just incase of out of bounds
         colorSet = false;
         pixelBlock = new int[16 * 16];
         pixelBlocks = new int[16 * 16 * 1024];
@@ -88,17 +96,44 @@ public class MDEC {
         int r = value & 0xFF;
         int g = (value >>> 8) & 0xFF;
         int b = (value >>> 16) & 0xFF;
-        
         r /= 8;
         g /= 8;
         b /= 8;
         return r << 0 | g << 5 | b << 10;
     }
 
+    private int out = 0;
     public int readMacroblockData() {
         int index = pixelBlockArea;
-        pixelBlockArea += 2;
-        return toRgb(pixelBlocks[index]) | toRgb(pixelBlocks[index + 1]) << 16;
+        int depth = (readStatusRegister() >>> 25) & 3;
+
+        if (out >= pixelBlockAreaSize || pixelBlockArea >= pixelBlockAreaSize) {
+            mdecStatusRegister |= 1 << 31;
+            return 0;
+        }
+
+        mdecStatusRegister &= ~(1 << 31);
+        switch (depth) {
+        case 2:
+            pixelBlockArea++;
+            switch (index % 4) {
+            case 0:
+                return pixelBlocks[out] | (pixelBlocks[out + 1] << 24);
+            case 1:
+                return ((pixelBlocks[out + 1] & 0xffff00) >> 8) | ((pixelBlocks[out + 2] & 0xffff) << 16);
+            case 2: {
+                int data  = ((pixelBlocks[out + 2] & 0xff0000) >>> 16) | ((pixelBlocks[out + 3] & 0xffffff) << 8);
+                pixelBlockArea = 0;
+                out += 4;
+                return data;
+            }
+            }
+            break;
+        case 3:
+            pixelBlockArea += 2;
+            return pixelBlocks[index] | pixelBlocks[index + 1] << 16;
+        }
+        return 0;
     }
 
     private void realIdctCore(int[] src) {
@@ -140,25 +175,26 @@ public class MDEC {
         int qfact = data >>> 10;
         int coeff = signExtend(data & 0x3FF);
         int value = coeff * ((int)quantTable[chroma ? 64 : 0] & 0xFF);
-        while (n < 64) {
+        int k = 0;
+        while (k < 64) {
             if (qfact == 0)
                 value = signExtend(data & 0x3FF) * 2;
-
             value = saturate(value);
 
             if (qfact > 0)
-                block[zigzag[zigzag[n]]] = value;
+                block[zagzig[k]] = value;
             if (qfact == 0)
-                block[n] = value;
-
-            data = mdecCodeBlock[++src];
-            if (data == 0xDEAD) {
-                src = -1;
+                block[k] = value;
+            ++src;
+            data = mdecCodeBlock[src];
+            if (data == 0xFE00) {
+                // src = -1;
                 break;
             }
 
-            value = (signExtend(data & 0x3FF) * quantTable[chroma ? n + 64 : n + 0] * qfact + 4) / 8;
-            n += (data >>> 10) + 1;
+            n = data;
+            k = k + ((n >>> 10) & 0x3F) + 1;
+            value = (signExtend(data & 0x3FF) * quantTable[chroma ? k + 64 : k] * qfact + 4) / 8;
             continue;
         }
 
@@ -174,30 +210,24 @@ public class MDEC {
         return value;
     }
 
-    class MacroblockYCbCr {
-        int Y;
-        int Cb;
-        int Cr;
-    }
-    
     private void convertToRgb() {
         int xx = 0, yy = 0;
         for (int block = 0; block < 4; block++) {
             int[] yBlock = null;
             switch (block) {
-            case 0:
+            case 0: // upper left
                 xx = 0; yy = 0;
                 yBlock = y1Block;
                 break;
-            case 1:
-                xx = 0; yy = 8;
+            case 1: // upper right
+                xx = 8; yy = 0;
                 yBlock = y2Block;
                 break;
-            case 2:
-                xx = 8; yy = 0;
+            case 2: // lower left
+                xx = 0; yy = 8;
                 yBlock = y3Block;
                 break;
-            case 3:
+            case 3: // lower right
                 xx = 8; yy = 8;
                 yBlock = y4Block;
                 break;
@@ -226,19 +256,15 @@ public class MDEC {
     private int counter = 0;
     public void writeDataWord(int data) {
         int copyBits = (data & 0x1E000000) >>> 2;
-        boolean commandSet = false;
         if ((mdecStatusRegister & (1 << 29)) == 0) {
             currentCommand = data >>> 29;
             commandData = data;
+            mdecStatusRegister &= ~(1 << 30);
             switch (currentCommand) {
+            case 4: case 5: case 6: case 7: case 0: break;
             case DECODE_MACROBLOCK:
                 parameterSize = parameterCounter = (data & 0xFFFF) * 4L;
-                currentBlock = 4;
-                mdecStatusRegister = (mdecStatusRegister & ~0x70000) | currentBlock << 16;
                 pixelBlockArea = 0;
-                pixelBlockSize = 1;
-                for (int i = 0; i < mdecCodeBlock.length; i++)
-                    mdecCodeBlock[i] = 0xDEAD;
                 break;
             // the values are from the jakub bad apple test
             case SETQUANT_TABLE:
@@ -255,7 +281,6 @@ public class MDEC {
 
             mdecStatusRegister = (mdecStatusRegister & ~0x7800000) | copyBits;
             mdecStatusRegister &= ~(1 << 31);
-            commandSet = true;
         }
 
         int baseOffset = (int)(parameterSize - parameterCounter - 4);
@@ -264,13 +289,6 @@ public class MDEC {
             case DECODE_MACROBLOCK: {
                 mdecCodeBlock[currentMdecCodeOffset] = data & 0xFFFF;
                 mdecCodeBlock[currentMdecCodeOffset + 1] = data >>> 16;
-
-                // TODO: implement this properly later
-                if ((mdecCodeBlock[currentMdecCodeOffset + 1] == 0xFE00) || (mdecCodeBlock[currentMdecCodeOffset] == 0xFE00)) {
-                    currentBlock = (currentBlock + 1) % 6;
-                    mdecStatusRegister = (mdecStatusRegister & ~0x70000) | currentBlock << 16;
-                }
-
                 currentMdecCodeOffset += 2;
                 break;
             }
@@ -289,58 +307,53 @@ public class MDEC {
             mdecStatusRegister &= ~(1 << 29);
             switch (currentCommand) {
             case DECODE_MACROBLOCK: {
+                mdecStatusRegister |= 1 << 30;
                 int depth = (readStatusRegister() >>> 25) & 3;
                 src = 0;
-                while (src < parameterSize && src != -1) {
+                while (src < parameterSize / 2) {
                     src = decodeRLBlock(crBlock, 5, src, true);
-                    if (src == -1)
-                        break;
-
                     src = decodeRLBlock(cbBlock, 6, src, true);
-                    if (src == -1)
-                        break;
-
                     src = decodeRLBlock(y1Block, 1, src, false);
-                    if (src == -1)
-                        break;
-
                     src = decodeRLBlock(y2Block, 2, src, false);
-                    if (src == -1)
-                        break;
-
                     src = decodeRLBlock(y3Block, 3, src, false);
-                    if (src == -1)
-                        break;
-
                     src = decodeRLBlock(y4Block, 4, src, false);
-                    if (src == -1)
-                        break;
-
                     switch (depth) {
                     case 2:
-                    case 3: {
                         convertToRgb();
                         for (int x = 0; x < 16 * 16; x++) {
-                            pixelBlocks[x + pixelBlockArea] = pixelBlock[x];
+                            int BGR = pixelBlock[x];
+                            pixelBlocks[pixelBlockArea + x] = BGR;
                         }
 
                         pixelBlockArea += 256;
                         break;
+                    case 3: {
+                        convertToRgb();
+                        for (int x = 0; x < 16 * 16; x++) {
+                            int BGR = pixelBlock[x];
+                            pixelBlocks[pixelBlockArea + x] = toRgb(BGR);
+                        }
+                        pixelBlockArea += 256;
+                        break;
                     }
                     default:
-                        System.out.printf("Unimplemented macroblock depth %d\n", depth);
+                        System.out.printf("Unimplemented macroblock depth %d\n", crBlock[0]);
                         System.exit(1);
                     }
                 }
 
-                pixelBlockSize = pixelBlockArea;
+                out = 0;
+                pixelBlockAreaSize = pixelBlockArea;
                 pixelBlockArea = 0;
                 src = 0;
                 currentMdecCodeOffset = 0;
                 break;
             }
             }
+
             currentCommand = 0;
+            mdecStatusRegister = (mdecStatusRegister & ~0xFFFF) | (int)(((parameterCounter >>> 2) - 1) & 0xFFFF);
+            mdecStatusRegister |= (1 << 30);
         } else {
             mdecStatusRegister |= 1 << 29;
             mdecStatusRegister = (mdecStatusRegister & ~0xFFFF) | (int)(((parameterCounter >>> 2) - 1) & 0xFFFF);
@@ -351,12 +364,9 @@ public class MDEC {
     public void writeMdecControl(int value) {
         int dataInRequest = value & (1 << 30);
         int dataOutRequest = value & (1 << 29);
+        mdecStatusRegister = (mdecStatusRegister & ~(1 << 28)) | dataInRequest >>> 2;
+        mdecStatusRegister = (mdecStatusRegister & ~(1 << 27)) | dataOutRequest >>> 2;
         if ((value & 0x80000000) != 0)
             mdecStatusRegister = 0x80040000; // aborts all commands as well
-
-        if (dataInRequest != 0)
-            mdecStatusRegister = (mdecStatusRegister & ~(1 << 28)) | dataInRequest >>> 2;
-        if (dataOutRequest != 0)
-            mdecStatusRegister = (mdecStatusRegister & ~(1 << 27)) | dataOutRequest >>> 2;
     }
 }

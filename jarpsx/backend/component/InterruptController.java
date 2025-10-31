@@ -64,7 +64,6 @@ public class InterruptController {
     public void writeMask(int mask) {
         if ((emulator.interruptController.status & mask) == 0)
             emulator.mips.cop0reg[13].value &= ~(1 << 10);
-        mask |= 1 << 9;
         this.mask = mask;
     }
 }
