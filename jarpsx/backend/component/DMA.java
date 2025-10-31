@@ -113,7 +113,7 @@ public class DMA {
                 words = 0x10000;
 
             if (index == CDROM) {
-                System.out.printf("CDROM %x %x %x cycles %x %x %x\n", channel.getBaseAddress(), words, emulator.cdrom.getCurrentSectorLba(), emulator.mips.getCyclesElapsed(), emulator.mips.PC, emulator.mips.gpr[31]);
+                System.out.printf("CDROM %x %x lba %d cycles %x\n", channel.getBaseAddress(), words, emulator.cdrom.getCurrentSectorLba(), emulator.mips.getCyclesElapsed());
             }
 
             int baseAddress = channel.getBaseAddress() & ~3;
@@ -132,7 +132,7 @@ public class DMA {
                         emulator.memory.writeInt(baseAddress, data);
                         break;
                     case CDROM:
-                        emulator.memory.writeInt(baseAddress, emulator.cdrom.readDataWord());
+                        emulator.cdrom.writeDataWord(baseAddress);
                         break;
                     default:
                         System.out.printf("Unimplemented transfer blocks to DMA requests channel %d", index);

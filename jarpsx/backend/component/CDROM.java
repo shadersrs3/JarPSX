@@ -233,7 +233,7 @@ public class CDROM {
     private int HCHPCTL;
     private int HINTSTS; // IRQ Flags are there 
     private int HINTMSK;
-    private int sectorLba; // For Setloc
+    public int sectorLba; // For Setloc
     private int mode; // For Setmode
     private int statusCode; // For commands
     private Fifo parameterFifo;
@@ -310,6 +310,7 @@ public class CDROM {
                     int sector = BCD(parameterFifo.fetch().data);
                     System.out.printf("SetLoc %d:%d:%d\n", mm, ss, sector);
                     sectorLbaCurrent = sectorLba = CdPosToInt(mm, ss, sector);
+                    sectorLbaCurrent += 8;
                     sectorOffset = 0;
                     requestType = REQUEST_INT3;
                     setDelay(1000);
@@ -465,8 +466,16 @@ public class CDROM {
         return _data;
     }
 
-    byte[] subheader = new byte[4];
-    int sectorLbaCurrent;
+    public byte[] subheader = new byte[4];
+    private int sectorLbaCurrent;
+    public void writeDataWord(int addr) {
+        boolean isXaAdpcm = (mode & 0x40) != 0;
+        if (sectorOffset == 0) {
+            System.out.printf("LBA %d submode %d\n", sectorLba, subheader[2]);
+        }
+        emulator.memory.writeInt(addr, readDataWord());
+    }
+
     public int readDataWord() {
         byte[] data = new byte[4];
         int sectorSizeMax = (mode & (1 << 5)) != 0 ? 0x924 : 0x800;
@@ -475,11 +484,7 @@ public class CDROM {
         boolean isXaAdpcm = (mode & 0x40) != 0;
 
         if (sectorOffset == 0) {
-            if (sectorSizeMax == 0x924) {
-                emulator.disk.readData(subheader, sectorLba * 0x930 + 0xC + 4, 4);
-            } else {
-                subheader[2] = 0;
-            }
+            emulator.disk.readData(subheader, sectorLba * 0x930 + 0xC + 4, 4);
         }
 
         if (sectorSizeMax == 0x924) {
@@ -493,8 +498,7 @@ public class CDROM {
             sectorOffset = 0;
             sectorLba++;
             if (isXaAdpcm && sectorLbaCurrent + 7 == sectorLba) {
-                sectorLbaCurrent = sectorLba + 1;
-                sectorLba++;
+                sectorLbaCurrent = sectorLba;
             }
             dataReady = true;
         }
@@ -556,19 +560,28 @@ public class CDROM {
             }
             break;
         case REQUEST_INT1_REQUEST:
-            requestType = REQUEST_INT1;
-            break;
         case REQUEST_INT1:
             requestType = REQUEST_INT1;
             responseFifo.enqueue(readStatusCode());
-            doIrq(Int_DataReady);
             HSTS |= 1 << 6;
             HCHPCTL &= ~0x80;
             dataReady = false;
+
+            emulator.disk.readData(subheader, sectorLba * 0x930 + 0xC + 4, 4);
             if (cmd == 0x1b) {
+                if (subheader[2] != 100) {
+                    doIrq(Int_DataReady);
+                } else {
+                    if ((mode & 0x40) == 0) {
+                        doIrq(Int_DataReady);
+                    }
+                }
+            } else {
+                doIrq(Int_DataReady);
             }
+
             if ((mode & (1 << 7)) != 0) {
-                setDelay(ReadDoubleSpeed);
+                setDelay(ReadDoubleSpeed / 2);
             } else {
                 setDelay(ReadSingleSpeed);
             }

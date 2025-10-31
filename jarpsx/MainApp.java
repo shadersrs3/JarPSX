@@ -35,7 +35,7 @@ public class MainApp {
             System.exit(1);
         }
 
-        GUI gui = new GUI(emu);
+        // GUI gui = new GUI(emu);
 
         while (true) {
             long start = System.nanoTime();
