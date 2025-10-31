@@ -580,7 +580,7 @@ public class CDROM {
             }
 
             if ((mode & (1 << 7)) != 0) {
-                setDelay(ReadDoubleSpeed * 3);
+                setDelay((int)(ReadDoubleSpeed * 4.25f));
             } else {
                 setDelay(ReadSingleSpeed);
             }
