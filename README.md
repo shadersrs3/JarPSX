@@ -3,6 +3,7 @@ PSX emulator written in Java
 
 <img width="991" height="528" alt="image" src="https://github.com/user-attachments/assets/ddf108c5-4e6c-4e74-9f3e-4ac4f133f6f3" />
 <img width="975" height="476" alt="image" src="https://github.com/user-attachments/assets/3e17bcec-a63d-43ad-9eeb-6c8291f44d85" />
-<img width="266" height="258" alt="image" src="https://github.com/user-attachments/assets/d7a6ae5e-5f13-47d9-a08d-462fd5b46911" />
+<img width="324" height="469" alt="image" src="https://github.com/user-attachments/assets/254a305f-39c9-44f2-be15-84d3e4babe9b" />
+
 
 Special thanks to emudev: Snake, Chicho, Lycoder, netcat, marlxx, JustinCase and Virror
