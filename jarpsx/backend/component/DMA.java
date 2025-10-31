@@ -112,10 +112,6 @@ public class DMA {
             if (words == 0)
                 words = 0x10000;
 
-            if (index == CDROM) {
-                System.out.printf("CDROM %x %x lba %d cycles %x\n", channel.getBaseAddress(), words, emulator.cdrom.getCurrentSectorLba(), emulator.mips.getCyclesElapsed());
-            }
-
             int baseAddress = channel.getBaseAddress() & ~3;
             for (int i = 0; i < words; i++) {
                 int data;

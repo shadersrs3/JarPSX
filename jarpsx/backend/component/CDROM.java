@@ -67,6 +67,7 @@ class Fifo {
     }
     
     public void reset() {
+        front = back = 0;
         currentSize = 0;
     }
     
@@ -79,7 +80,7 @@ class Fifo {
     }
 }
 
-public class CDROM {        
+public class CDROM {
     public static class XaAdpcmDecoder {
         private int fileNumber;
         private int channelNumber;
@@ -438,8 +439,8 @@ public class CDROM {
         }
         case 3:
             if (currentRegisterBank == 1 || currentRegisterBank == 3)
-                return HINTSTS;
-            return HINTMSK;
+                return HINTSTS | 0xE0;
+            return HINTMSK | 0xE0;
         }
 
         System.out.printf("UNIMPLEMENTED READ BANK %d OFFSET %d", currentRegisterBank, offset);
@@ -510,8 +511,6 @@ public class CDROM {
         this.delay = delay;
     }
 
-    int counter;
-
     public void step(int cycles) {
         if (delay > 0) {
             delay -= cycles;
@@ -562,7 +561,8 @@ public class CDROM {
         case REQUEST_INT1_REQUEST:
         case REQUEST_INT1:
             requestType = REQUEST_INT1;
-            responseFifo.enqueue(readStatusCode());
+            responseFifo.reset();
+            responseFifo.enqueue(readStatusCode() | 1 << 5);
             HSTS |= 1 << 6;
             HCHPCTL &= ~0x80;
             dataReady = false;
@@ -572,16 +572,15 @@ public class CDROM {
                 if (subheader[2] != 100) {
                     doIrq(Int_DataReady);
                 } else {
-                    if ((mode & 0x40) == 0) {
-                        doIrq(Int_DataReady);
-                    }
+                    if ((mode & 0x40) != 0)
+                        ++sectorLba;
                 }
             } else {
                 doIrq(Int_DataReady);
             }
 
             if ((mode & (1 << 7)) != 0) {
-                setDelay(ReadDoubleSpeed / 2);
+                setDelay(ReadDoubleSpeed * 3);
             } else {
                 setDelay(ReadSingleSpeed);
             }

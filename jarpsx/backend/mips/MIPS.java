@@ -326,16 +326,7 @@ public class MIPS {
             break;
         }
 
-        data = readInt(PC);
-        
-        if (PC == 0x8001ae24) {
-            System.out.printf("dec vlc 0x%08X %08x\n", PC, gpr[A0]);
-            // System.exit(1);
-        }
-        if (PC == 0x8001a620) {
-            System.out.printf("DecDCTin\n");
-        }
-
+        data = readInt(PC);        
         currentInstruction.setData(data);
         return currentInstruction;
     }

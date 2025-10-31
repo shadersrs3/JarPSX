@@ -89,7 +89,7 @@ public class MDEC {
     }
 
     public int readStatusRegister() {
-        return mdecStatusRegister; 
+        return mdecStatusRegister;
     }
 
     public int toRgb(int value) {
