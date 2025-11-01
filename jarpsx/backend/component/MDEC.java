@@ -115,6 +115,7 @@ public class MDEC {
         mdecStatusRegister &= ~(1 << 31);
         switch (depth) {
         case 2:
+        /* // ACTUAL 24-BIT COLOR!!!
             pixelBlockArea++;
             switch (index % 4) {
             case 0:
@@ -123,6 +124,21 @@ public class MDEC {
                 return ((pixelBlocks[out + 1] & 0xffff00) >> 8) | ((pixelBlocks[out + 2] & 0xffff) << 16);
             case 2: {
                 int data  = ((pixelBlocks[out + 2] & 0xff0000) >>> 16) | ((pixelBlocks[out + 3] & 0xffffff) << 8);
+                pixelBlockArea = 0;
+                out += 4;
+                return data;
+            }
+            }
+        */
+            pixelBlockArea++;
+            
+            switch (index % 4) {
+            case 0:
+                return pixelBlocks[out] | pixelBlocks[out + 1] << 16;
+            case 1:
+                return pixelBlocks[out + 1] | pixelBlocks[out + 2] << 16;
+            case 2: {
+                int data = pixelBlocks[out + 2] | pixelBlocks[out + 3] << 16;
                 pixelBlockArea = 0;
                 out += 4;
                 return data;
@@ -322,7 +338,7 @@ public class MDEC {
                         convertToRgb();
                         for (int x = 0; x < 16 * 16; x++) {
                             int BGR = pixelBlock[x];
-                            pixelBlocks[pixelBlockArea + x] = BGR;
+                            pixelBlocks[pixelBlockArea + x] = toRgb(BGR);
                         }
 
                         pixelBlockArea += 256;

@@ -2,89 +2,139 @@ package jarpsx.backend.component;
 
 import jarpsx.backend.Emulator;
 import jarpsx.backend.component.InterruptController;
+import jarpsx.backend.component.PSXController;
 
 public class Peripheral {
     private Emulator emulator;
-    private int SIO0_STAT;
-    private int packetsSent = 0;
-    private int SIO0_CTRL;
-
-    private int test = 0;
-
     private int[] buffer;
+    private int stat;
+    private int ctrl;
+    private int mode;
+    private int baud;
+    private int baudRateTimer;
+    private int cpuCycles;
+    private int[] rxData;
+    private int rxIndex;
+    private int txData;
+    private int state;
+    private int halfwordsReceived = 0;
+    int interruptModeCounter;
+    
     public Peripheral(Emulator emulator) {
         this.emulator = emulator;
-        SIO0_STAT = 0;
-        SIO0_CTRL = 0;
-        test = 0;
-        buffer = new int[16];
-        buffer[0] = 0x01;
-        buffer[1] = 0x42;
-        buffer[2] = 0x5A;
+        rxData = new int[32];
+        stat = 3;
     }
 
-    public void writeSioTxData(int index, int data) {
-        // System.out.printf("Write TX data %04X\n", data);
-        SIO0_STAT |= 1 << 1;
-        if (--packetsSent <= 0) {
-            SIO0_STAT |= 1 << 2;
+    public int getReloadFactor() {        
+        return switch (mode & 3) {
+            case 0 -> 1;
+            case 1 -> 1;
+            case 2 -> 16;
+            case 3 -> 64;
+            default -> 0; // dead code bullshit
+        };
+    }
+
+    public void writeTxData(int data) {
+        prevTxData = txData;
+        txData = data;
+    }
+
+    private int currentResponseCounter = 0;
+    private int prevTxData;
+
+    public int readRxData() {
+        int data = rxData[rxIndex];
+        int port = (ctrl & (1 << 13)) != 0 ? 2 : 1;
+        int interruptModeBytes;
+        
+        switch ((mode >>> 8) & 3) {
+        case 0: interruptModeBytes = 1; break;
+        case 1: interruptModeBytes = 2; break;
+        case 2: interruptModeBytes = 4; break;
+        case 3: interruptModeBytes = 8; break;
+        default:
+            interruptModeBytes = 0;
+        };
+        
+        if (++interruptModeCounter == interruptModeBytes) {
+            interruptModeCounter = 0;
+            emulator.interruptController.service(InterruptController.IRQ_SIO0);
+        }
+
+        if (port == 2)
+            return 0;
+
+        if (prevTxData == 0x42 && txData == 0) {
+            return 0x5A;
         }
         
-        if ((SIO0_CTRL & (1 << 10)) != 0) {
-            SIO0_STAT |= 1 << 9;
-            // emulator.interruptController.service(InterruptController.IRQ_SIO);
-        }
-    }
-
-    public int readSioRxData(int index) {
-        if (++test > 5) {
-            test = 0;
-            SIO0_STAT &= ~(1 << 1);
-        }
-        return buffer[test++ % 16];
-    }
-    
-    public int readSioStat(int index) {
-        return 0xFFFFFFFF;
-    }
-
-    public void writeSioMode(int index, int data) {
-        // System.out.printf("Write mode %04X\n", data);
-    }
-
-    public int readSioMode(int index) {
-        // System.out.printf("Read mode\n");
-        return 0;
-    }
-
-    public void writeSioCtrl(int index, int data) {
-        if ((data & (1 << 0)) != 0) {
-            packetsSent = 5;
-            SIO0_STAT |= 1 << 0;
-        } else {
-            SIO0_STAT &= ~(1 << 0);
-        }
-        
-        if ((data & (7 << 10)) != 0) {
-            SIO0_STAT |= 1 << 9;
-            emulator.interruptController.service(InterruptController.IRQ_SIO);
+        if (halfwordsReceived != 0) {
+            halfwordsReceived--;
+            currentResponseCounter++;
+            switch (currentResponseCounter) {
+            case 1: // lower byte
+                return emulator.psxController.getButtonState(0);
+            case 2: // upper byte
+                return emulator.psxController.getButtonState(1);
+            case 3:
+                return 0x80;
+            case 4:
+                return 0x80;
+            case 5:
+                return 0x80;
+            case 6:
+                return 0x80;
+            // etc..
+            }
         }
 
-        SIO0_CTRL = data;
-        // System.out.printf("Write control %04X\n", data);
+        switch (txData) {
+        case 1: // always a psx pad controller
+            break;
+        case 0x42:
+            halfwordsReceived = 2 + 2 + 2;
+            currentResponseCounter = 0;
+            return 0x73;
+        }
+        return data;
     }
 
-    public int readSioCtrl(int index) {
-        // System.out.printf("Read control\n");
-        return SIO0_CTRL;
+    public int readStat() {
+        return stat | baudRateTimer << 11;
     }
 
-    public int readSioBaudRate(int index) {
-        System.out.printf("Read baudrate\n");
-        return 0;
+    public void writeMode(int data) {
+        mode = data;
     }
 
-    public void writeSioBaudRate(int index, int value) {
-        // System.out.printf("Write baudrate %04X\n", value);
+    public int readMode() {
+        return mode;
+    }
+
+    public void writeCtrl(int data) {
+        if ((data & (1 << 4)) != 0)
+            stat &= ~0x238;
+        ctrl = data;
+    }
+
+    public int readCtrl() {
+        return ctrl;
+    }
+
+    public int readBaudRate() {
+        return baud;
+    }
+
+    public void writeBaudRate(int value) {
+        baud = value;
+    }
+
+    public void step(int cycles) {
+        baudRateTimer -= cycles;
+        if (baudRateTimer <= 0) {
+            baudRateTimer = getReloadFactor() * readBaudRate() / 2;
+        }
     }
 }

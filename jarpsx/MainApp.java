@@ -18,10 +18,10 @@ public class MainApp {
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\RidgeRacer\\ridgeracer.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\mk2\\mk2.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\crash\\crash.bin");
-            emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\pepsiman\\pepsiman.bin");
+            // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\pepsiman\\pepsiman.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\turismo\\gt1.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\ffix\\ffix.bin");
-            // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\badapple\\movie2.bin");
+            emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\badapple\\movie2.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\spyro\\spyro.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\ff7\\ff7.bin");
             // emu.disk.loadBinary(Paths.get("").toAbsolutePath().toString() + "\\data\\games\\redux\\test.bin");

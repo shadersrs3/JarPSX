@@ -18,11 +18,14 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Container;
 import javax.swing.border.TitledBorder;
+import java.awt.event.KeyListener;
+import java.awt.event.KeyEvent;
 
 import javax.swing.text.*;
 import jarpsx.backend.Emulator;
 import jarpsx.backend.mips.Disassembler;
 import javax.swing.plaf.basic.BasicScrollBarUI;
+import jarpsx.backend.component.PSXController;
 
 import javax.swing.event.*;
 
@@ -297,7 +300,53 @@ public class GUI {
         try { UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel"); } catch (Exception e) {} // hack change to nimbus for linux/macos
         // try { UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel"); } catch (Exception e) {} // hack change to nimbus for linux/macos
         frame = new JFrame("JarPSX Emulator");
+        frame.addKeyListener(new KeyListener() {
+            public void keyHandler(KeyEvent e, boolean pressed) {
+                switch (e.getKeyCode()) {
+                case KeyEvent.VK_Z:
+                    emulator.psxController.setButtonState(PSXController.CIRCLE, pressed);
+                    break;
+                case KeyEvent.VK_X:
+                    emulator.psxController.setButtonState(PSXController.CROSS, pressed);
+                    break;
+                case KeyEvent.VK_LEFT:
+                    emulator.psxController.setButtonState(PSXController.JOYPAD_LEFT, pressed);
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    emulator.psxController.setButtonState(PSXController.JOYPAD_RIGHT, pressed);
+                    break;
+                case KeyEvent.VK_UP:
+                    emulator.psxController.setButtonState(PSXController.JOYPAD_UP, pressed);
+                    break;
+                case KeyEvent.VK_DOWN:
+                    emulator.psxController.setButtonState(PSXController.JOYPAD_DOWN, pressed);
+                    break;
+                case KeyEvent.VK_C:
+                    emulator.psxController.setButtonState(PSXController.TRIANGLE, pressed);
+                    break;
+                case KeyEvent.VK_V:
+                    emulator.psxController.setButtonState(PSXController.SQUARE, pressed);
+                    break;
+                case KeyEvent.VK_Q:
+                    emulator.psxController.setButtonState(PSXController.SELECT, pressed);
+                    break;
+                case KeyEvent.VK_W:
+                    emulator.psxController.setButtonState(PSXController.START, pressed);
+                    break;
+                }
+            }
 
+            public void keyPressed(KeyEvent e) {
+                keyHandler(e, true);
+            }
+
+            public void keyReleased(KeyEvent e) {
+                keyHandler(e, false);
+            }
+            
+            public void keyTyped(KeyEvent e) {
+            }
+        });
         JMenuBar menuBar;
         JMenu menu;
         MenuItem menuItem;

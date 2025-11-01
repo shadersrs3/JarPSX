@@ -203,7 +203,7 @@ public class Memory {
 
             if (offset >= 0x1040 && offset <= 0x104E) {
                 switch (offset) {
-                case 0x1040: return (byte)emulator.peripheral.readSioRxData(0);
+                case 0x1040: return (byte)emulator.peripheral.readRxData();
                 }
             }
 
@@ -245,11 +245,11 @@ public class Memory {
 
             if (offset >= 0x1040 && offset <= 0x104E) {
                 switch (offset) {
-                case 0x1040: return (short)emulator.peripheral.readSioRxData(0);
-                case 0x1044: return (short)emulator.peripheral.readSioStat(0);
-                case 0x1048: return (short)emulator.peripheral.readSioMode(0);
-                case 0x104A: return (short)emulator.peripheral.readSioCtrl(0);
-                case 0x104E: return (short)emulator.peripheral.readSioBaudRate(0);
+                case 0x1040: return (short)emulator.peripheral.readRxData();
+                case 0x1044: return (short)emulator.peripheral.readStat();
+                case 0x1048: return (short)emulator.peripheral.readMode();
+                case 0x104A: return (short)emulator.peripheral.readCtrl();
+                case 0x104E: return (short)emulator.peripheral.readBaudRate();
                 }
             }
 
@@ -338,7 +338,7 @@ public class Memory {
             if (offset >= 0x1040 && offset <= 0x104E) {
                 switch (offset) {
                 case 0x1040:
-                    emulator.peripheral.writeSioTxData(0, (int)value & 0xFF);
+                    emulator.peripheral.writeTxData((int)value & 0xFF);
                     return;
                 }
             }
@@ -368,10 +368,10 @@ public class Memory {
 
             if (offset >= 0x1040 && offset <= 0x104E) {
                 switch (offset) {
-                case 0x1040: emulator.peripheral.writeSioTxData(0, (int)value & 0xFFFF); return;
-                case 0x1048: emulator.peripheral.writeSioMode(0, (int)value & 0xFFFF); return;
-                case 0x104A: emulator.peripheral.writeSioCtrl(0, (int)value & 0xFFFF); return;
-                case 0x104E: emulator.peripheral.writeSioBaudRate(0, (int)value & 0xFFFF); return;
+                case 0x1040: emulator.peripheral.writeTxData((int)value & 0xFFFF); return;
+                case 0x1048: emulator.peripheral.writeMode((int)value & 0xFFFF); return;
+                case 0x104A: emulator.peripheral.writeCtrl((int)value & 0xFFFF); return;
+                case 0x104E: emulator.peripheral.writeBaudRate((int)value & 0xFFFF); return;
                 }
             }
 

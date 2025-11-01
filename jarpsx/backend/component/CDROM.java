@@ -198,7 +198,7 @@ public class CDROM {
     private static final int StatusCode_Error = 1 << 0;
 
     private static final int[] NoDiskData = { 0x08, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-    private static final int[] LicensedMode2Data = { 0x02, 0x00, 0x20, 0x00, (int)'S', (int)'C', (int)'E', (int)'A' };
+    private static final int[] LicensedMode2Data = { 0x02, 0x00, 0x20, 0x00, (int)'S', (int)'D', (int)'R', (int)'S' };
 
     private static final int NopAverage = 0xC4E1;
     private static final int InitAverage = 0x13CCE;
@@ -206,8 +206,8 @@ public class CDROM {
     private static final int ReadDoubleSpeed = 0x6E400 / 2;
     // Second response
     private static final int GetIDAverage = 0x4A00;
-    private static final int PauseSingleSpeed = 0x021181c;
-    private static final int PauseDoubleSpeed = 0x010bd93;
+    private static final int PauseSingleSpeed = 0x021181c / 4;
+    private static final int PauseDoubleSpeed = 0x010bd93 / 4;
     private static final int PausePaused = 0x0001df2;
 
     private static final int REQUEST_INT3 = 1;
@@ -302,6 +302,12 @@ public class CDROM {
                 System.out.printf("CMD %02x %d\n", value, requestType);
                 switch (value) {
                 case 0x1:
+                    if (requestType != 0) {
+                        responseFifo.enqueue(readStatusCode());
+                        doIrq(Int_Acknowledge);
+                        HSTS &= ~(1 << 7);
+                        break;
+                    }
                     requestType = REQUEST_INT3;
                     setDelay(0x2012);
                     break;
@@ -333,6 +339,10 @@ public class CDROM {
                     setDelay(5000);
                     break;
                 }
+                case 0x0D: // setfilter
+                    requestType = REQUEST_INT3;
+                    setDelay(5000);
+                    break;
                 case 0x1B: // ReadS
                     requestType = REQUEST_INT3_INT1;
                     setDelay(50000);
@@ -470,10 +480,6 @@ public class CDROM {
     public byte[] subheader = new byte[4];
     private int sectorLbaCurrent;
     public void writeDataWord(int addr) {
-        boolean isXaAdpcm = (mode & 0x40) != 0;
-        if (sectorOffset == 0) {
-            System.out.printf("LBA %d submode %d\n", sectorLba, subheader[2]);
-        }
         emulator.memory.writeInt(addr, readDataWord());
     }
 
@@ -482,7 +488,6 @@ public class CDROM {
         int sectorSizeMax = (mode & (1 << 5)) != 0 ? 0x924 : 0x800;
         int submode = (int)subheader[2] & 0xFF;
         int isData = (submode >>> 3) & 1;
-        boolean isXaAdpcm = (mode & 0x40) != 0;
 
         if (sectorOffset == 0) {
             emulator.disk.readData(subheader, sectorLba * 0x930 + 0xC + 4, 4);
@@ -498,9 +503,6 @@ public class CDROM {
         if (sectorOffset == sectorSizeMax || (isData == 1 && sectorOffset == 0x80C)) {
             sectorOffset = 0;
             sectorLba++;
-            if (isXaAdpcm && sectorLbaCurrent + 7 == sectorLba) {
-                sectorLbaCurrent = sectorLba;
-            }
             dataReady = true;
         }
 

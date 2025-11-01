@@ -31,8 +31,8 @@ public class Emulator {
     public Stats stats;
     public GPU gpu;
     public Disk disk;
+    public PSXController psxController;
     private boolean error;
-
     public Emulator() {
         scheduler = new Scheduler(this);
         memory = new Memory(this);
@@ -48,6 +48,7 @@ public class Emulator {
         stats = new Stats();
         disk = new Disk();
 
+        psxController = new PSXController();
         stats.microsecondsRanPerFrame = stats.microsecondsRan = 0;
         scheduler.registerEventCallback(Scheduler.EVENT_BREAK_DISPATCH, (userdata) -> {
             scheduler.schedule(20000, Scheduler.EVENT_BREAK_DISPATCH, null);
@@ -169,6 +170,7 @@ public class Emulator {
             for (int i = 0; i < cycles; i++) {
                 mips.step();
                 timer.step();
+                peripheral.step(1);
                 cdrom.step(1);
                 if ((mips.getCyclesElapsed() % 345000) == 0) {
                     interruptController.service(InterruptController.IRQ_VBLANK);

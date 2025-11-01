@@ -15,7 +15,7 @@ public class InterruptController {
     public static final int IRQ_TMR0 = 4;
     public static final int IRQ_TMR1 = 5;
     public static final int IRQ_TMR2 = 6;
-    public static final int IRQ_CTRL = 7;
+    public static final int IRQ_SIO0  = 7;
     public static final int IRQ_SIO = 8;
     public static final int IRQ_SPU = 9;
 

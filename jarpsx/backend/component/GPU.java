@@ -369,11 +369,10 @@ public class GPU {
     void fillRectangle(int x, int y, int width, int height, int color) {
         int red = color & 0xFF, green = (color >>> 8) & 0xFF, blue = (color >>> 16) & 0xFF;
         for (int j = 0; j < height; j++) {
-            for (int i = 0; i < width; i += 0x10) {
+            for (int i = 0; i < width; i++) {
                 int r = red / 8, g = green / 8, b = blue / 8;
-                color = (r & 0x1F) | ((g & 0x1F) << 5) | ((b & 0x1F) << 10);
-                for (int n = 0; n < 0x10; n++)
-                    drawPixel(x+i+n, x+j, color);
+                color = r | g << 5 | b << 10;
+                writeVram16(x + i, j + y, color);
             }
         }
     }
@@ -431,34 +430,6 @@ public class GPU {
     public void writeVram16(int x, int y, int value) {
         vramData[y * 1024 + x] = value & 0xFFFF;
     }
-
-    public int readVram32(int x, int y) {
-        return 0;
-    }
-
-    public void writeVram32(int x, int y, int value) {
-        int offset = ((x & ~3) << 1) + (y << 8);
-        int _x = x & 3;
-        x &= ~3;
-        switch (_x) {
-        case 0:
-            vramData[offset] = value & 0xFFFF;
-            vramData[offset + 1] = (value >>> 16) & 0xFFFF;
-            break;
-        case 1:
-            writeVram16(x * 2 + 1, y, value);
-            writeVram16(x * 2 + 2, y, (value >>> 16));
-            break;
-        case 2:
-            writeVram16(x * 2 + 2, y, value);
-            writeVram16(x * 2 + 3, y, (value >>> 16));
-            break;
-        case 3:
-            writeVram16(x * 2 + 3, y, value);
-            writeVram16(x * 2 + 4, y, (value >>> 16));
-            break;
-        }
-    }
     
     public int readGpuStat() {
         int dma = 0;
@@ -487,13 +458,15 @@ public class GPU {
     }
     
     public int readGpuRead() {
-        int data;
+        int data = 0;
         if (--vramToCpuSizeDecrement >= 0) {
-            data = readVram16(vramToCpuCurrentXPosition, vramToCpuCurrentYPosition) | readVram16(vramToCpuCurrentXPosition + 1, vramToCpuCurrentYPosition) << 16;
-            vramToCpuCurrentXPosition += 2;
-            if (vramToCpuCurrentXPosition >= vramToCpuTargetXPosition) {
-                vramToCpuCurrentXPosition = vramToCpuInitialXPosition;
-                ++vramToCpuCurrentYPosition;
+            for (int i = 0; i < 2; i++) {
+                data |= readVram16(vramToCpuCurrentXPosition, vramToCpuCurrentYPosition) << (i * 16);
+                vramToCpuCurrentXPosition++;
+                if (vramToCpuCurrentXPosition >= vramToCpuTargetXPosition) {
+                    vramToCpuCurrentXPosition = vramToCpuInitialXPosition;
+                    ++vramToCpuCurrentYPosition;
+                }
             }
 
             if (vramToCpuSizeDecrement == 0)
@@ -566,11 +539,7 @@ public class GPU {
                 int ysiz = data >>> 16;
                 xsiz = ((xsiz - 1) & 0x3FF) + 1;
                 ysiz = ((ysiz - 1) & 0x1FF) + 1;
-                int sizeDecrement = xsiz * ysiz;
-
-                if ((sizeDecrement & 1) != 0)
-                    sizeDecrement += 1;
-
+                int sizeDecrement = (xsiz * ysiz + 1) & ~1;
                 sizeDecrement >>>= 1;
                 this.sizeDecrement = sizeDecrement;
                 targetXPosition = initialXPosition + xsiz;
@@ -582,12 +551,13 @@ public class GPU {
             }
             case 3:
                 if (--sizeDecrement >= 0) {
-                    writeVram16(currentXPosition, currentYPosition, data);
-                    writeVram16(currentXPosition + 1, currentYPosition, ((data >>> 16) & 0xFFFF));
-                    currentXPosition += 2;
-                    if (currentXPosition >= targetXPosition) {
-                        currentXPosition = initialXPosition;
-                        ++currentYPosition;
+                    for (int i = 0; i < 2; i++) {
+                        writeVram16(currentXPosition, currentYPosition, ((data >>> (i * 16)) & 0xFFFF));
+                        currentXPosition++;
+                        if (currentXPosition >= targetXPosition) {
+                            currentXPosition = initialXPosition;
+                            ++currentYPosition;
+                        }
                     }
                 }
 
@@ -613,11 +583,8 @@ public class GPU {
                 int ysiz = data >>> 16;
                 xsiz = ((xsiz - 1) & 0x3FF) + 1;
                 ysiz = ((ysiz - 1) & 0x1FF) + 1;
-                int sizeDecrement = xsiz * ysiz;
-                if ((sizeDecrement & 1) != 0)
-                    sizeDecrement = (sizeDecrement + 1) >>> 1;
-                else
-                    sizeDecrement >>>= 1;
+                int sizeDecrement = (xsiz * ysiz + 1) & ~1;
+                sizeDecrement >>>= 1;
                 renderType = 0;
                 break;
             }
@@ -634,12 +601,7 @@ public class GPU {
                 int ysiz = data >>> 16;
                 xsiz = ((xsiz - 1) & 0x3FF) + 1;
                 ysiz = ((ysiz - 1) & 0x1FF) + 1;
-                int sizeDecrement = xsiz * ysiz;
-                if ((sizeDecrement & 1) != 0)
-                    sizeDecrement = (sizeDecrement + 1) >>> 1;
-                else
-                    sizeDecrement >>>= 1;
-
+                int sizeDecrement = (xsiz * ysiz + 1) & ~1;
                 vramToCpuSizeDecrement = sizeDecrement;
                 vramToCpuTargetXPosition = vramToCpuInitialXPosition + xsiz;
                 vramToCpuTargetYPosition = vramToCpuInitialYPosition + ysiz;
